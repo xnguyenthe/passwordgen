@@ -1,0 +1,137 @@
+{
+    "extensionDescription": {
+        "message": "Generátor jednoúčelových hesiel, ktorý umožňuje na každej doméne používať vždy rovnakú heslovú frázu, pričom vygenerované heslo bude pre každú doménu jedinečné."
+    },
+    "popup_inputlabel_domain": {
+        "message": "Doména:"
+    },
+    "popup_inputlabel_pdl": {
+        "message": "Nadradená doména:"
+    },
+    "popup_inputlabel_pwd": {
+        "message": "Heslo:"
+    },
+    "popup_inputlabel_generatedpwd": {
+        "message": "Vygenerované heslo:"
+    },
+    "popup_description_C_1": {
+        "message": "Generátor vygeneruje pre doménu "
+    },
+    "popup_description_1_1": {
+        "message": " heslo podľa uloženého pravidla."
+    },
+    "popup_description_2_1": {
+        "message": " heslo s rovnakými nastaveniami, aké sa používajú pre všetky "
+    },
+    "popup_description_3_1": {
+        "message": " heslo podľa aktuálnych nastavení generátora."
+    },
+    "popup_description_C_2": {
+        "message": "Heslo bude dlhé "
+    },
+    "popup_description_2_2": {
+        "message": " subdomény."
+    },
+    "popup_description_C_3_one": {
+        "message": " znak v "
+    },
+    "popup_description_C_3_few": {
+        "message": " znaky v "
+    },
+    "popup_description_C_3_other": {
+        "message": " znakov v "
+    },
+    "popup_description_C_4": {
+        "message": " kódovaní."
+    },
+    "popup_alert_rule_not_found": {
+        "message": "Heslo nie je možné vygenerovať - pravidlo pre túto doménu ešte nie je uložené"
+    },
+    "options_p_gen_prefs": {
+        "message": "Nastavenia generátora"
+    },
+    "options_lbl_pwd_length": {
+        "message": "Dĺžka hesla:"
+    },
+    "options_lbl_const": {
+        "message": "Konštanta:"
+    },
+    "options_lbl_enc": {
+        "message": "Kódovanie:"
+    },
+    "options_lbl_time": {
+        "message": "Čas zobrazovania hesla [s]"
+    },
+    "options_p_storage_settings": {
+        "message": "Nastavenia uložených pravidiel"
+    },
+    "options_lbl_store": {
+        "message": "Ukladať pravidlá generovania"
+    },
+    "options_lbl_use_stored": {
+        "message": "Generovať heslo podľa uložených pravidiel"
+    },
+    "options_btn_del_all_rules": {
+        "message": "Vymaž všetky uložené pravidlá"
+    },
+    "options_p_import": {
+        "message": "Import nastavení a pravidiel"
+    },
+    "options_p_export": {
+        "message": "Export nastavení a pravidiel"
+    },
+    "options_p_stored_rules": {
+        "message": "Uložené pravidlá"
+    },
+    "options_th_domain": {
+        "message": "Doména"
+    },
+    "options_th_pwd_length": {
+        "message": "Dĺžka hesla"
+    },
+    "options_th_base64": {
+        "message": "Base-64 kódovanie"
+    },
+    "options_th_hex": {
+        "message": "HEX kódovanie"
+    },
+    "options_th_pdl": {
+        "message": "Nadradená doména"
+    },
+    "options_th_del": {
+        "message": "Vymaž pravidlo"
+    },
+    "options_confirm_del_all_rules": {
+        "message": "Všetky uložené pravidlá budu vymazané"
+    },
+    "options_alert_not_json_file": {
+        "message": "Zvolený súbor nie je JSON"
+    },
+    "options_alert_file_large": {
+        "message": "Zvolený súbor je príliž veľký"
+    },
+    "options_alert_invalid_json": {
+        "message": "Zvolený JSON súbor má neplatný formát"
+    },
+    "options_alert_invalid_preference_name": {
+        "message": "Zvolený JSON súbor obsahuje neplatný názov nastavenia"
+    },
+    "options_alert_invalid_preference_type": {
+        "message": "Zvolený JSON súbor obsahuje neplatný typ nastavenia"
+    },
+    "options_alert_invalid_pwd_len": {
+        "message": "Zvolený JSON súbor obsahuje neplatnú hodnotu dĺžky hesla: "
+    },
+    "options_alert_invalid_time": {
+        "message": "Zvolený JSON súbor obsahuje neplatnú hodnotu času zobrazovania hesla: "
+    },
+    "options_alert_invalid_const_len": {
+        "message": "Zvolený JSON súbor obsahuje neplatnú hodnotu dĺžky konštanty"
+    },
+    "options_alert_invalid_base64_enc": {
+        "message": "Zvolený JSON súbor obsahuje neplatnú hodnotu Base-64 kódovania"
+    },
+    "options_alert_invalid_hex_enc": {
+        "message": "Zvolený JSON súbor obsahuje neplatnú hodnotu HEX kódovania"
+    }
+}

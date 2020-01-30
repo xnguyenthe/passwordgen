@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="options.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+
+<body>
+    <p id="p_gen_prefs"></p>
+    <div>
+        <label id="lbl_pwd_length"></label>
+        <input type="number" id="in_pwd_length" class="number" min="1" max="86">
+    </div>
+    <div>
+        <label id="lbl_const"></label>
+        <input type="text" id="in_constant" maxlength="100">
+    </div>
+    <div>
+        <label id="lbl_enc"></label>
+        <input type="radio" id="rb_base64" name="encoding" value="base-64" , checked> Base-64 </input>
+        <input type="radio" id="rb_hex" name="encoding" value="hex"> HEX </input>
+    </div>
+    <div>
+        <label id="lbl_time"></label>
+        <input type="number" id="in_time" class="number" min="0" max="60">
+    </div>
+    </div>
+
+    <p id="p_storage_settings"></p>
+    <div>
+        <label id="lbl_store"></label>
+        <input type="checkbox" id="cb_store">
+    </div>
+    <div>
+        <label id="lbl_use_stored"></label>
+        <input type="checkbox" id="cb_use_stored" class="checkbox">
+    </div>
+    <div>
+        <button id="btn_del_all_rules"></button>
+    </div>
+    <p id="p_import"></p>
+    <div>
+        <input id="in_import" type="file" accept="application/json">
+    </div>
+    <p id="p_export"></p>
+    <div>
+        <button id="btn_export">Export...</button>
+    </div>
+
+    <p id="p_stored_rules"></p>
+    <table id="table_stored_rules">
+        <thead>
+            <tr>
+                <th id="th_domain"></th>
+                <th id="th_pwd_length"></th>
+                <th id="th_base64"></th>
+                <th id="th_hex"></th>
+                <th id="th_pdl"></th>
+                <th id="th_del"></th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <script src="options.js"></script>
+</body>
+
+</html>
