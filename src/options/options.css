@@ -1,0 +1,117 @@
+.material-icons.md-18 { font-size: 18px; }
+
+input[type=text] {
+    /*width: 12em;*/
+    width: 90%;
+}
+
+input.number {
+    box-sizing: border-box;
+    text-align: center;
+    width: 3em;
+}
+
+input {
+    margin: auto;
+    width: 80%;
+    border: 0;
+}
+
+.pointer {
+    cursor: pointer;
+}
+
+.associated-domains-row {
+    background-color: aliceblue;
+}
+
+.associated-domains-row .pointer:hover {
+    color: lightslategrey;
+}
+
+table {
+    width: 100%;
+}
+
+td {
+    box-sizing: border-box;
+    /*display: inline-flex;*/
+    /*border-left: 1px solid grey;*/
+    /*margin: 0;*/
+    /*padding: 0;*/
+    /*border-width: 0;*/
+    border-radius: 10px;
+    /*border: 1px solid black;*/
+    /*background-color: lightgrey;*/
+}
+
+thead th{
+    background-color: darkslategrey;
+    color: white;
+}
+
+.preferences-row:hover {
+    background-color: cornflowerblue;
+}
+
+.preferences-row td {
+    text-align: center;
+    padding: 5px;
+}
+
+.lower-column {
+    background-color: rgba(127, 0, 255, 0.3);
+}
+.lower-column input {
+    margin: 3px;
+}
+
+.upper-column {
+    background-color: rgba(0, 127, 255, 0.3);
+}
+.upper-column input {
+    margin: 3px;
+}
+
+.num-column{
+    background-color: rgba(255, 127, 0, 0.3);
+}
+.num-column input {
+    margin: 3px;
+}
+
+.special-column {
+    background-color: rgba(255, 0, 0, 0.3)
+}
+.special-column input {
+    margin: 3px;
+}
+
+/*.preferences-row:hover, .preferences-row:hover + .associated-domains-row {*/
+/*    background-color: orange;*/
+/*}*/
+
+/* The alert message box */
+.alert {
+    padding: 20px;
+    background-color: #f44336; /* Red */
+    color: white;
+    margin-bottom: 15px;
+}
+
+/* The close button */
+.closebtn {
+    margin-left: 15px;
+    color: white;
+    font-weight: bold;
+    float: right;
+    font-size: 22px;
+    line-height: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+/* When moving the mouse over the close button */
+.closebtn:hover {
+    color: black;
+}

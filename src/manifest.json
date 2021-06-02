@@ -1,0 +1,42 @@
+{
+  "manifest_version": 2,
+  "name": "PasswordGen_test",
+  "description": "A deterninistic password generator. Use the same password to generate secure passwords that are different for each web domain.",
+  "version": "1.0",
+  "author": "xnguyenthe",
+  "homepage_url": "https://github.com/DanKub/PasswordGen",
+  "icons": {
+    "64": "icons/passwordgen-64.png"
+  },
+
+  "applications": {
+    "gecko": {
+      "id": "passwordgennew@passwordgen.local"
+    }
+  },
+
+  "browser_action": {
+    "browser_style": true,
+    "default_icon": "icons/passwordgen-64.png",
+    "default_title": "PasswordGen",
+    "default_popup": "popup/popup.html"
+  },
+  "options_ui": {
+    "page": "options/options.html"
+  },
+  "background": {
+    "scripts": [
+      "background/background.js"
+    ]
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "identity",
+    "https://publicsuffix.org/list/public_suffix_list.dat"
+  ],
+  "optional_permissions": [
+    "*://www.googleapis.com/*",
+    "downloads"
+  ]
+}

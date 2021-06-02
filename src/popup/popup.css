@@ -1,0 +1,265 @@
+body {
+    width: 20em;
+}
+
+header {
+    background-color: darkslategrey;
+    color: white;
+    padding: 0.5em;
+}
+
+header #heading_logo {
+    margin: 0px;
+    font-weight: bold;
+    font-size: 1.5em;
+    cursor: pointer;
+}
+
+.container {
+    display: flex;
+}
+
+.flex-column {
+    flex-direction: column;
+}
+
+footer {
+    margin: auto;
+}
+
+main {
+    margin: 0.5em;
+}
+
+.pointer {
+    cursor: pointer;
+}
+/* HOME PAGE and OPTIONS PAGE*/
+
+.pwd_options_container {
+    padding: 0.5em;
+    margin-bottom: 0.5em;
+    border-radius: 5px;
+}
+
+.pwd_options_container.changed {
+    background-color: cornsilk;
+}
+
+.pwd_options_container.from_storage {
+    background-color: rgba(47, 79, 79, 0.2);
+}
+
+.encoding_options_container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.encoding_options_container div {
+    display: flex;
+    /*align-items: center;*/
+}
+
+.default-store-inject-copy-options {
+    display: grid;
+    grid-template-columns: 2em auto;
+    align-items: start;
+    row-gap: 0.5em;
+}
+
+#btn-show-defaults {
+    float: right;
+}
+
+#btn-show-defaults:hover {
+    color: lightslategrey;
+}
+
+.material-icons.md-18 {
+    font-size: 18px;
+}
+
+.label-tag-row{
+    position: relative;
+    display: flex;
+}
+
+.label-tag-row div{
+    width: 100%;
+}
+
+.label-tag-row #home-domain-span {
+    width: 100%;
+    font-weight: bold;
+    color: red;
+    text-align: center;
+}
+
+.label-tag-row .material-icons {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translate(-80%, -50%);
+    color: darkslategrey;
+}
+
+/*#home-pwd_options {*/
+/*    border: 1px solid;*/
+/*    border-color: blue;*/
+/*}*/
+
+/* About page */
+h4 {
+    margin: 0px;
+}
+
+p em {
+    font-weight: bold;
+}
+
+#save_and_generate_row {
+    display: inline-grid;
+    grid-template-columns: 2em auto;
+    margin-top: 0.2em;
+}
+
+#show_password_qr_row {
+    display: grid;
+    grid-template-columns: 2em auto 2em 2em;
+    justify-items: center;
+    align-items: center;
+    margin-top: 0.2em;
+}
+
+button {
+    border: none;
+    padding: 0;
+    text-align: center;
+}
+
+#toggle-show-pwd {
+    /*background-image: url("../icons/eye_icon.svg");*/
+}
+#home-qr_code-btn {
+    /*background-image: url("../icons/qr_code_icon.svg");*/
+}
+
+#home-generated_password{
+    font-size: 0.8em;
+}
+
+select {
+    background-color: darkslategrey;
+    color: white;
+    border: 1px dashed white;
+    padding: 5px;
+}
+/*.icon_container {*/
+/*    display: block;*/
+/*    position: relative;*/
+/*    cursor: pointer;*/
+/*}*/
+
+/*.icon_container input {*/
+/*    position: absolute;*/
+/*    opacity: 0;*/
+/*    cursor: pointer;*/
+/*    height: 0;*/
+/*    width: 0;*/
+/*}*/
+
+/*#icon_save {*/
+/*    position: absolute;*/
+/*    top: 0;*/
+/*    left: 0;*/
+/*    width: 1em;*/
+/*    height: 1em;*/
+/*    background-image: url("../icons/save_icon.svg");*/
+/*}*/
+
+/*.icon_container input:checked ~ #icon_save {*/
+/*    background-color: #2196F3;*/
+/*}*/
+
+
+/*----------- pwd length slider ---------------------------*/
+.pwd_len_container {
+    width: 100%; /* Width of the outside container */
+}
+
+.slider {
+    -webkit-appearance: none;  /* Override default CSS styles */
+    appearance: none;
+    width: 100%; /* Full-width */
+    height: 5px; /* Specified height */
+    background: #d3d3d3; /* Grey background */
+    outline: none; /* Remove outline */
+    opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
+    -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+    transition: opacity .2s;
+}
+
+/* Mouse-over effects */
+.slider:hover {
+    opacity: 1; /* Fully shown on mouse-over */
+}
+
+/* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 10px; /* Set a specific slider handle width */
+    height: 10px; /* Slider handle height */
+    background: #04AA6D; /* Green background */
+    cursor: pointer; /* Cursor on hover */
+}
+
+.slider::-moz-range-thumb {
+    width: 10px; /* Set a specific slider handle width */
+    height: 10px; /* Slider handle height */
+    background: #04AA6D; /* Green background */
+    cursor: pointer; /* Cursor on hover */
+}
+
+/* ------------------ ALERTS --------------------------*/
+
+
+/* The alert message box */
+.alert {
+    padding: 10px;
+    color: white;
+    margin-bottom: 15px;
+    opacity: 1;
+    transition: opacity 0.6s;
+}
+
+.alert-warning {
+    background-color: orange;
+}
+
+.alert-danger {
+    background-color: #f44336; /* Red */
+}
+
+/* The close button */
+.close_alert-btn {
+    margin-left: 15px;
+    color: white;
+    font-weight: bold;
+    float: right;
+    font-size: 20px;
+    line-height:15px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+/* When moving the mouse over the close button */
+.close_alert-btn:hover {
+    color: black;
+}
+
+.warning_note {
+    background-color: #ffffcc;
+    border-left: 6px solid #ffeb3b;
+}

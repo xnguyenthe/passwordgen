@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script defer src="oauth_authorize.js"></script>
+    <script defer src="options.js"></script>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet"/>
+    <link rel="stylesheet" href="options.css"/>
+
+</head>
+<body>
+    <h1>Options page</h1>
+    <div id="errors-container"></div>
+    <p>Here you will find the settings for the following things:</p>
+    <ul>
+        <li>"User/Password" profiles (changing profile names, creating profiles, and deleting them).</li>
+        <li>Import/Export a file with default preferences and individual password preferences.</li>
+        <li>Using GoogleDrive to upload aforementioned file and download it for syncing purposes.</li>
+        <li>Table with all the stored individual preferences as per the user profile.</li>
+    </ul>
+
+    <h4>Profile 1</h4>
+    <button id="export-btn">Export</button>
+    <input id="import-btn" type="file" name="Import"/>
+    <button id="upload-to-gdrive-btn">Upload backup to google Drive</button>
+    <button id="download-from-gdrive-btn">Download backup from Google Drive</button>
+
+    <section>
+        <h3>Stored preferences for domains</h3>
+        <button id="delete-all-btn">Delete All Stored Preferences</button>
+        <section id="table-container">
+            <table id="table"></table>
+        </section>
+        <pre id="database-result"></pre>
+    </section>
+</body>
+</html>
