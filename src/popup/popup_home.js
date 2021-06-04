@@ -27,6 +27,8 @@ const DOM_error = document.getElementById("error-content");
 let suffListData; //extracted suff list data from storage upon opening of the popup
 let indiPrefDB; //DB object of the individual preferences upon opening of the popup
 
+let indiPrefs = [];
+
 /* Filled with the preferences for *domain* upon initialization (if it can be found),
 *   and modified with the preferences for Service whenever the user changes the service field (if it can be found)
 * data is taken from the indiPrefDB
@@ -45,6 +47,145 @@ let isStored = {
 //                ^  ^ caused by user input, when he changes the service field - he can either change it to smth that already exists, or not
 
 // -------------------------- HELPER FUNCTION DEFINITIONS --------------------------
+
+function openIndiPrefDB(){
+    return new Promise((resolve, reject) => {
+        const dbOpenRequest = window.indexedDB.open("IndiPref");
+
+        dbOpenRequest.onerror = function(event){
+            reject("Error occured while opening the database 'GeneratorRules': " + event.target.error);
+        }
+
+        dbOpenRequest.onsuccess = function (event){
+            resolve(event.target.result); // return the database object
+        }
+    });
+
+}
+
+/*return a promise that resolves witht the preference of the active profile*/
+function getActiveProfilePreference(){
+    return browser.storage.local.get("profiles")
+        .then(result => result.profiles.activeProfile)
+        .then(activeProfileId => {
+            return browser.storage.local.get("preferences").then(result => {
+                return result.preferences.find(el => el.id == activeProfileId);
+            });
+        });
+}
+
+/*  return (a promise that resolves with) the entire array of individual preferences for the given profile
+*   if the profile does not exist in the database, return an empty array
+* */
+function getAllIndiPrefsForActiveProfile(db, profilePreference){
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["preferences"], "readonly");
+        const objStore = transaction.objectStore("preferences");
+
+        const request = objStore.get(profilePreference.id);
+        request.onerror = function(event){
+            console.log(`An error occured getting the indiPrefs for ${profilePreference.id}`);
+            console.log(event.target.error);
+            reject(event.target.error);
+        }
+        request.onsuccess = function(event){
+            console.log(`The entire database result for ${profilePreference.id} is: `);
+            console.log(event.target.result);
+            const result = event.target.result;
+
+            //if the key for the profile does NOT exist, return an empty array
+            if(result === undefined){
+                resolve([]);
+                return;
+            }
+
+            //if encrypted then decrypt
+            if(profilePreference.encrypt === true){
+
+            }
+            resolve(result);
+        }
+    });
+}
+
+/*return the preference object for domain if found, otherwise undefined*/
+function getPrefForDomain(domain){
+    return indiPrefs.find(el => el.domain == domain);
+}
+
+/*return the first preference object of a given service if found, otherwise undefined*/
+function getPrefForService(service){
+    return indiPrefs.find(el => el.service == service);
+}
+/*return an array of all the services that have been saved in the database*/
+function getAllServices(){
+    let services = [];
+    indiPrefs.forEach(el => {
+        if(!services.includes(el.service)){
+            services.push(el.service);
+        }
+    });
+
+    return services;
+}
+
+function storePrefInDB(){
+    const preference = {};
+    //preference.profile =
+    preference.service = DOM_domain_main_part.value;
+    preference.domain = DOM_domain_name.innerText; // unique and used as key
+    preference.encoding = {
+        lower: DOM_checkbox_lower_case.checked,
+        upper: DOM_checkbox_upper_case.checked,
+        num: DOM_checkbox_numbers.checked,
+        special: DOM_checkbox_special_chars.checked
+    };
+    preference.length = DOM_password_length.value;
+    preference.constant = DOM_constant.value; //get the constant here
+
+    //put the preference for domain in the array
+    //change the preference for all the services with the same name in the array
+    const indexOfPref = indiPrefs.findIndex(el => el.domain == preference.domain);
+    if(indexOfPref != -1){
+        //update the existing preference
+        indiPrefs[indexOfPref] = preference;
+    }
+    else {
+        //preference does not exist, push it into the array
+        indiPrefs.push(preference);
+    }
+
+    indiPrefs.forEach(el => {
+        if(el.service == preference.service){
+            el.encoding = preference.encoding;
+            el.length = preference.length;
+            el.constant = preference.constant;
+        }
+    });
+
+    //sort the array by service and domain
+    indiPrefs.sort((firstEl, secondEl) => {
+        let serviceToService = firstEl.service.localeCompare(secondEl.service);
+        if(serviceToService > 0){
+            return 1;
+        }
+        else {
+            return firstEl.domain.localeCompare(secondEl.domain);
+        }
+    });
+
+    const storeData = indiPrefs;
+    //put the array in the database
+    if(preferencesDefault.encrypt){
+        console.log(`Encrypting the rules before saving in the database`);
+        //if it is to be encrypted then encrypt the storeData
+    }
+
+    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+    const objStore = transaction.objectStore("preferences");
+
+    objStore.put(storeData, preferencesDefault.id);
+}
 
 /*
 * Should return the domain name (url without the protocol, path to file, parameters, or anchors) including port, if there is one
@@ -93,21 +234,6 @@ function get_main_domain_or_ip(domain_or_ip){
 
     //if you don't pass a url with a valid public suffix, it will return an empty string, so in that case we can use what we got from the tab url
     return result == "" ? domain_or_ip_without_port: result;
-}
-
-function openIndiPrefDB(){
-    return new Promise((resolve, reject) => {
-        const dbOpenRequest = window.indexedDB.open("IndiPref");
-
-        dbOpenRequest.onerror = function(event){
-            reject("Error occured while opening the database 'GeneratorRules': " + event.target.error);
-        }
-
-        dbOpenRequest.onsuccess = function (event){
-            resolve(event.target.result); // return the database object
-        }
-    });
-
 }
 
 //!! CAREFUL, we don't only update an existing value but should also change the value for all with the same service name
@@ -366,6 +492,20 @@ function setPasswordPreferencesInHomepageUI(prefs){
     DOM_password_length_label.innerText = prefs.length;
 }
 
+function fillProfileSelect(preferences, activeProfileId){
+    const select = document.getElementById("heading-user_select");
+    select.innerHTML = "";
+
+    preferences.forEach(el => {
+        let option = document.createElement("option");
+        option.value = el.id;
+        option.innerText = el.profile;
+        if(el.id == activeProfileId){
+            option.selected = true;
+        }
+        select.append(option);
+    });
+}
 
 //load the database with rules and load the pub suffix list
 //load the preferences
@@ -379,8 +519,28 @@ async function initialize(){
         console.log(error);
     }
 
+    //get the active profile
+    //determine if it's encrypted - if yes, show the encrypted page
+    //if not just show the regular page
+    preferencesDefault = await getActiveProfilePreference();
+    if(preferencesDefault.encrypt == true){
 
-    //catch errorw here too
+    }
+    else {
+
+    }
+
+    //get the list of profiles
+    const preferenceProfiles = await browser.storage.local.get("preferences")
+        .then(result => result.preferences);
+
+    fillProfileSelect(preferenceProfiles, preferencesDefault.id);
+
+    //fill the user select in html document
+    indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault);
+
+
+    //catch errors here too
     const activeTabUrl = await browser.tabs.query({currentWindow: true, active: true}).then(tabs => tabs[0].url);
     const domain = get_url_without_protocol_or_path(activeTabUrl);
     DOM_domain_name.innerText = domain;
@@ -389,10 +549,8 @@ async function initialize(){
 
     // LOADING THE PREFERENCES
     //check if there is a preference for this domain, if not, load the default preferences
-    const prefFromDB = await getPreferenceForDomainFromDatabase(domain);
-    const prefDefault = await browser.storage.local.get("preferences").then(r => r.preferences);
-
-    preferencesDefault = prefDefault;
+    const prefFromDB = getPrefForDomain(domain);
+    const prefDefault = preferencesDefault;
 
     if(prefFromDB === undefined){
         console.log(`Preference for domain "${domain}" not found in DB.`);
@@ -400,7 +558,7 @@ async function initialize(){
 
         isStored.domain = false;
 
-        const prefForService = await getPreferenceForServiceFromDatabase(service_name);
+        const prefForService = await getPrefForService(service_name);
         if(prefForService === undefined){
             console.log(`Preferences for service "${service_name}" not found either. Using default preferences.`);
             setPasswordPreferencesInHomepageUI(prefDefault);
@@ -427,7 +585,7 @@ async function initialize(){
     DOM_store_preference.checked = prefDefault.save_preferences;
 
     //ADDING THE AUTOFILL
-    const allServicesArray = await getAllServiceNames();
+    const allServicesArray = getAllServices();
 
     displayUIDetails(allServicesArray);
 }
@@ -517,7 +675,8 @@ function generatePasswordHandler(event){
     //store if desired
     if(DOM_store_preference.checked){
         //store rule in database
-        storePreferenceForServiceInDB();
+        //storePreferenceForServiceInDB();
+        storePrefInDB();
     }
 
     //hide the note about potential change in stored pwd preference
@@ -537,7 +696,8 @@ async function changeInServiceNameHandler(event){
 
     console.log(`Service field changed to: ${DOM_domain_main_part.value}`);
     try {
-        const pref = await getPreferenceForServiceFromDatabase(DOM_domain_main_part.value);
+        //const pref = await getPreferenceForServiceFromDatabase(DOM_domain_main_part.value);
+        const pref = getPrefForService(DOM_domain_main_part.value);
         if(pref !== undefined){
             preferenceForService = pref;
             setPasswordPreferencesInHomepageUI(pref);

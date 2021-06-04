@@ -15,7 +15,7 @@ function initIndiPrefDB() {
 
         dbOpenReq.onupgradeneeded = function (event) {
             var db = dbOpenReq.result;
-            var objStore = db.createObjectStore("preferences", {keyPath: "domain"});
+            var objStore = db.createObjectStore("preferences");
 
             /*objects stored in this IDBObjectStore will have the following format:
             * { service: "mozilla",
@@ -30,7 +30,8 @@ function initIndiPrefDB() {
             *   constant: "my Constant"
             *  }
             * */
-            objStore.createIndex("service", "service");
+
+            //objStore.createIndex("service", "service");
         }
 
         dbOpenReq.onsuccess = function (event) {
@@ -116,7 +117,7 @@ function initDefaultPreferences() {
     p.then((prefObj) => {
             //if retrieved object has no keys (if no preferences are stored), then set default preferences
             if ( !prefObj.hasOwnProperty("preferences") ) {
-                browser.storage.local.set({preferences: preference})
+                browser.storage.local.set({preferences: [preference]})
                     .catch(logError);
             }
 
