@@ -1,9 +1,26 @@
 // ------------------ GLOBAL VARIABLES
 const MAX_FILE_SIZE = 5;
 let indiPrefDB;
+
 let allPreferencesArray;
+let tempAllPreferencesArray;
+
+let allProfilesDefaults;
 
 // --------------------- HELPER FUNCTIONS ------------------------------
+/*return a promise that resolves with an object that contains the preferences for the active profile, and an array containing the preferences of all profiles*/
+function getDefaultPreferences(){
+    return browser.storage.local.get(["profiles", "preferences"])
+        .then(result => {
+            let activeProfileId = result.profiles.activeProfile;
+            let activeProfile = result.preferences.find(el => el.id === activeProfileId);
+            return {
+                activeProfile: activeProfile,
+                allPreferencesArray: result.preferences
+            };
+        });
+}
+
 function openIndiPrefDB(){
     return new Promise((resolve, reject) => {
         const dbOpenRequest = window.indexedDB.open("IndiPref");
@@ -18,6 +35,7 @@ function openIndiPrefDB(){
     });
 }
 
+/**/
 function getPreferencesFromDB(){
     return new Promise((resolve) => {
         const transaction = indiPrefDB.transaction(["preferences"], "readonly");
@@ -31,6 +49,27 @@ function getPreferencesFromDB(){
     });
 }
 
+function getAllPrefsForProfileFromDB(db, storage_id){
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["preferences"], "readonly");
+        const objStore = transaction.objectStore("preferences");
+
+        console.log(`getting preferences for ${storage_id} from DB`);
+        const request = objStore.get(storage_id);
+
+        request.onerror = function(event){
+            reject(event.target.error);
+        }
+
+        request.onsuccess = function(event){
+            console.log(`Success!`);
+            console.log(event.target.result);
+            resolve(event.target.result);
+        }
+
+    });
+}
+
 function insertDefaultSettings(defaults){
     browser.storage.local.set({preferences: defaults});
 }
@@ -39,15 +78,21 @@ function insertIndiPrefsIntoDB(indiPrefsArray){
     const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
     const objStore = transaction.objectStore("preferences");
 
+    /*TODO encrypt if needed*/
+    const dataToStore = allPreferencesArray;
+    if(allProfilesDefaults.activeProfile.encrypt){
+
+    }
+    objStore.put(dataToStore, allProfilesDefaults.activeProfile.id);
 
     //check each preference for its data validity adn reject any that are invalid
     //i.e. encoding - at least one has to be true, domain must be a valid url,
     //length must be a number within bounds, constant a not empty string, service a not empty string and a valid pdl
-    indiPrefsArray.forEach(pref => {
-        objStore.put(pref);
-    });
-
-    reloadDatabaseAndDisplay();
+    // indiPrefsArray.forEach(pref => {
+    //     objStore.put(pref);
+    // });
+    //
+    // reloadDatabaseAndDisplay();
 }
 
 //take the error place and append some error elements with children
@@ -184,6 +229,19 @@ function isValidImportedJSON(object){
 
 // ------------------------ MODiFYING THE TABLE ----------------------------
 
+/*sort the preferences array by service first and then by domain*/
+function sortAllPreferencesArray(){
+    allPreferencesArray.sort((firstEl, secondEl) => {
+        let serviceToService = firstEl.service.localeCompare(secondEl.service);
+        if(serviceToService > 0){
+            return 1;
+        }
+        else {
+            return firstEl.domain.localeCompare(secondEl.domain);
+        }
+    });
+}
+
 /* Change the password settings of all the preference objects filed under a particular service*/
 function changePasswordSettings(event){
     const input = event.target;
@@ -214,28 +272,44 @@ function changePasswordSettings(event){
 
     //validate constant
 
-    console.log(`The preferences for ${service} are: [len:${len}, lower:${encoding.lower}, upper:${encoding.upper}, num:${encoding.num}, special:${encoding.special}, constant:${constant}]`);
+    console.log(`The new preferences for ${service} are: [len:${len}, lower:${encoding.lower}, upper:${encoding.upper}, num:${encoding.num}, special:${encoding.special}, constant:${constant}]`);
 
-    //load all the database objects of this service and update them accordingly
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
-
-    const index = objStore.index("service");
-    const keyRange = IDBKeyRange.only(service);
-    index.openCursor(keyRange).onsuccess = function(event){
-        const cursor = event.target.result;
-        if(cursor){
-            const prefToUpdate = cursor.value;
-
-            prefToUpdate.encoding = encoding;
-            prefToUpdate.length = len;
-            prefToUpdate.constant = constant;
-
-            console.log(`Updating the preferences for the domain: ${prefToUpdate.domain}`);
-            objStore.put(prefToUpdate);
-            cursor.continue();
+    //change password settings for all the entries of a certain service
+    allPreferencesArray.every(pref => {
+        let strcmp = pref.service.localeCompare(service);
+        if(strcmp <= 0) {
+            if (strcmp === 0) {
+                console.log(`Changing the preferences for domain ${pref.domain}`);
+                pref.encoding = encoding;
+                pref.length = len;
+                pref.constant = constant;
+            }
+            return true;
         }
-    }
+        else { //break the loop when we've gone past the specified service - we can do this bcs the array is ordered by service and domain
+            return false;
+        }
+    });
+    //load all the database objects of this service and update them accordingly
+    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+    // const objStore = transaction.objectStore("preferences");
+    //
+    // const index = objStore.index("service");
+    // const keyRange = IDBKeyRange.only(service);
+    // index.openCursor(keyRange).onsuccess = function(event){
+    //     const cursor = event.target.result;
+    //     if(cursor){
+    //         const prefToUpdate = cursor.value;
+    //
+    //         prefToUpdate.encoding = encoding;
+    //         prefToUpdate.length = len;
+    //         prefToUpdate.constant = constant;
+    //
+    //         console.log(`Updating the preferences for the domain: ${prefToUpdate.domain}`);
+    //         objStore.put(prefToUpdate);
+    //         cursor.continue();
+    //     }
+    // }
 }
 
 /* Change all preferences under a particular service to a new service name. If the new service name already exists, it will also rewrite all the
@@ -255,57 +329,104 @@ function changeServiceName(event){
         newServiceNameAlreadyExists = true;
     }
 
-    //load all the database objects of this service and update them accordingly
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
+    //find each service that matches the old name, change it to the new name
+    allPreferencesArray.every(pref => {
+        let strcmp = pref.service.localeCompare(service);
+        if(strcmp <= 0) {
+            if (strcmp === 0) {
+                console.log(`Changing the service_name for domain ${pref.domain}`);
+                pref.service = new_service_name;
 
-    const index = objStore.index("service");
-    const keyRange = IDBKeyRange.only(service);
-    index.openCursor(keyRange).onsuccess = function(event){
-        const cursor = event.target.result;
-        if(cursor){
-            const prefToUpdate = cursor.value;
-
-            prefToUpdate.service = new_service_name;
-
-            //if the new name already exists we have to change the preferences to match the preferences for that service
-            if(newServiceNameAlreadyExists){
-                prefToUpdate.length = newServiceNamePreference.length;
-                prefToUpdate.encoding = newServiceNamePreference.encoding;
-                prefToUpdate.constant = newServiceNamePreference.constant;
+                //if the new name already exists we have to change the preferences to match the preferences for that service
+                if(newServiceNameAlreadyExists){
+                    pref.length = newServiceNamePreference.length;
+                    pref.encoding = newServiceNamePreference.encoding;
+                    pref.constant = newServiceNamePreference.constant;
+                }
             }
-
-            console.log(`Updating the preferences for the domain: ${prefToUpdate.domain}`);
-            objStore.put(prefToUpdate);
-            cursor.continue();
+            return true;
         }
-    }
+        else { //break the loop when we've gone past the specified service - we can do this bcs the array is ordered by service and domain
+            return false;
+        }
+    });
+
+    //sort the array again
+    sortAllPreferencesArray();
+
+    displayPreferences(allPreferencesArray);
+
+
+    //load all the database objects of this service and update them accordingly
+    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+    // const objStore = transaction.objectStore("preferences");
+    //
+    // const index = objStore.index("service");
+    // const keyRange = IDBKeyRange.only(service);
+    // index.openCursor(keyRange).onsuccess = function(event){
+    //     const cursor = event.target.result;
+    //     if(cursor){
+    //         const prefToUpdate = cursor.value;
+    //
+    //         prefToUpdate.service = new_service_name;
+    //
+    //         //if the new name already exists we have to change the preferences to match the preferences for that service
+    //         if(newServiceNameAlreadyExists){
+    //             prefToUpdate.length = newServiceNamePreference.length;
+    //             prefToUpdate.encoding = newServiceNamePreference.encoding;
+    //             prefToUpdate.constant = newServiceNamePreference.constant;
+    //         }
+    //
+    //         console.log(`Updating the preferences for the domain: ${prefToUpdate.domain}`);
+    //         objStore.put(prefToUpdate);
+    //         cursor.continue();
+    //     }
+    // }
 
     //redraw the table
-    reloadDatabaseAndDisplay();
+    //reloadDatabaseAndDisplay();
 }
 
 /* Delete all preferences filed under a particular service. */
 function deleteService(event){
     const service = event.target.dataset.service;
 
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
+    //get the indexes of all the services
+    allPreferencesArray.every((pref, index, array) => {
+        let strcmp = pref.service.localeCompare(service);
+        if(strcmp <= 0) {
+            if (strcmp === 0) {
+                console.log(`Deleting the entry for domain ${pref.domain}`);
 
-    const index = objStore.index("service");
-    const keyRange = IDBKeyRange.only(service);
-    index.openCursor(keyRange).onsuccess = function(event){
-        const cursor = event.target.result;
-        if(cursor){
-            const prefToDelete = cursor.value;
-
-            objStore.delete(prefToDelete.domain);
-            cursor.continue();
+                array.splice(index, 1);
+            }
+            return true;
         }
-    }
+        else { //break the loop when we've gone past the specified service - we can do this bcs the array is ordered by service and domain
+            return false;
+        }
+    });
+
+    displayPreferences(allPreferencesArray);
+
+
+    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+    // const objStore = transaction.objectStore("preferences");
+    //
+    // const index = objStore.index("service");
+    // const keyRange = IDBKeyRange.only(service);
+    // index.openCursor(keyRange).onsuccess = function(event){
+    //     const cursor = event.target.result;
+    //     if(cursor){
+    //         const prefToDelete = cursor.value;
+    //
+    //         objStore.delete(prefToDelete.domain);
+    //         cursor.continue();
+    //     }
+    // }
 
     //redraw the table
-    reloadDatabaseAndDisplay();
+    //reloadDatabaseAndDisplay();
 }
 
 /* Eject domain from the service it's filed under. This means changing the service name for the domain. */
@@ -321,21 +442,27 @@ function ejectDomain(event){
     }
     const domain = el.dataset.domain;
 
+    const elIndexToChange = allPreferencesArray.findIndex(pref => pref.domain === domain);
+    allPreferencesArray[elIndexToChange].service = allPreferencesArray[elIndexToChange].domain;
+
+    sortAllPreferencesArray();
+
+    displayPreferences(allPreferencesArray);
 
     //get the object from the database and chnage the
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
-
-    const request = objStore.get(domain);
-    request.onsuccess = function(event){
-        const pref = event.target.result;
-
-        pref.service = pref.domain;
-
-        objStore.put(pref);
-    }
-
-    reloadDatabaseAndDisplay();
+    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+    // const objStore = transaction.objectStore("preferences");
+    //
+    // const request = objStore.get(domain);
+    // request.onsuccess = function(event){
+    //     const pref = event.target.result;
+    //
+    //     pref.service = pref.domain;
+    //
+    //     objStore.put(pref);
+    // }
+    //
+    // reloadDatabaseAndDisplay();
 }
 
 /*Delete the preference for a specific domain*/
@@ -343,20 +470,28 @@ function deleteDomain(event){
     const domain = event.target.dataset.domain;
     console.log(`deleting domain: ${domain}`);
 
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
+    const elIndexToDelete = allPreferencesArray.findIndex(pref => pref.domain === domain);
+    allPreferencesArray.splice(elIndexToDelete, 1);
 
-    objStore.delete(domain);
+    displayPreferences(allPreferencesArray);
 
-    reloadDatabaseAndDisplay();
+    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+    // const objStore = transaction.objectStore("preferences");
+    //
+    // objStore.delete(domain);
+    //
+    // reloadDatabaseAndDisplay();
 }
 
 function deleteAllStoredPreferences(){
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
+    allPreferencesArray = [];
+    displayPreferences(allPreferencesArray);
 
-    objStore.clear();
-    reloadDatabaseAndDisplay();
+    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+    // const objStore = transaction.objectStore("preferences");
+    //
+    // objStore.clear();
+    // reloadDatabaseAndDisplay();
 }
 
 function toggleDomainsRow(event){
@@ -590,11 +725,16 @@ function displayPreferences(prefArray){
     });
 }
 
-async function reloadDatabaseAndDisplay(){
-    const prefs = await getPreferencesFromDB();
-    allPreferencesArray = prefs;
-    displayPreferences(prefs);
+function saveModifiedTable(){
+    console.log(`saving the modified preferences into the database`);
+    insertIndiPrefsIntoDB(allPreferencesArray);
 }
+
+// async function reloadDatabaseAndDisplay(){
+//     const prefs = await getPreferencesFromDB();
+//     allPreferencesArray = prefs;
+//     displayPreferences(prefs);
+// }
 
 // --------------------------- EXPORTING AND IMPORTING ------------------------------
 async function exportPreferences() {
@@ -728,12 +868,14 @@ function downloadFromGDrive(){
 async function initialize(){
     const IDBDatabeObject = await openIndiPrefDB();
     indiPrefDB = IDBDatabeObject;
-    const prefs = await getPreferencesFromDB();
 
-    //document.getElementById("database-result").innerHTML = JSON.stringify(prefs, null, 4);
+    //get the active profile or whatever, decide which profile to get it from
+    const allProfilesDefaultPreferences = await getDefaultPreferences();
+    allProfilesDefaults = allProfilesDefaultPreferences;
 
-    allPreferencesArray = prefs;
-    displayPreferences(prefs);
+    allPreferencesArray = tempAllPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaultPreferences.activeProfile.id);
+
+    displayPreferences(tempAllPreferencesArray);
 }
 
 initialize();
@@ -743,6 +885,7 @@ document.getElementById("import-btn").addEventListener("change", importSettings)
 document.getElementById("delete-all-btn").addEventListener("click", deleteAllStoredPreferences);
 document.getElementById("upload-to-gdrive-btn").addEventListener("click", uploadToGDrive);
 document.getElementById("download-from-gdrive-btn").addEventListener("click", downloadFromGDrive);
+document.getElementById("save_changes-btn").addEventListener("click", saveModifiedTable);
 
 /*
 * Bugs: first domain in the domain row, if there are multiple domains - the eject and delete buttons don't work - they don't have event listeners attached
