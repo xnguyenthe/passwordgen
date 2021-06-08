@@ -176,8 +176,8 @@ function storePrefInDB(){
     //sort the array by service and domain
     indiPrefs.sort((firstEl, secondEl) => {
         let serviceToService = firstEl.service.localeCompare(secondEl.service);
-        if(serviceToService > 0){
-            return 1;
+        if(serviceToService != 0){
+            return serviceToService;
         }
         else {
             return firstEl.domain.localeCompare(secondEl.domain);

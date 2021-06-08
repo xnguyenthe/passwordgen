@@ -7,7 +7,10 @@ let tempAllPreferencesArray;
 
 let allProfilesDefaults;
 
-let encryptionPassword; //initialized when the password profile that is selected is encrypted, and the user enters a password
+let encryptionPassword = {
+    password: undefined,
+    profile_id: undefined
+}; //initialized when the password profile that is selected is encrypted, and the user enters a password
 
 // --------------------- HELPER FUNCTIONS ------------------------------
 /*return a promise that resolves with an object that contains the preferences for the active profile, and an array containing the preferences of all profiles*/
@@ -51,7 +54,7 @@ function getPreferencesFromDB(){
     });
 }
 
-function getAllPrefsForProfileFromDB(db, storage_id){
+function getAllPrefsForProfileFromDB(db, storage_id, encrypted, password){
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(["preferences"], "readonly");
         const objStore = transaction.objectStore("preferences");
@@ -70,26 +73,53 @@ function getAllPrefsForProfileFromDB(db, storage_id){
                 resolve([]);
             }
             else{
-                resolve(event.target.result);
+                let prefs = event.target.result;
+                if(encrypted){
+                    resolve( JSON.parse(decrypt(password, prefs)) );
+                }
+                else {
+                    resolve(prefs);
+                }
             }
         }
     });
 }
 
 function insertDefaultSettings(defaults){
-    browser.storage.local.set({preferences: defaults});
+    //default settings for active profile
+    //get active profile
+    //update the active profile in storage preferences
+    const activeProfileID = allProfilesDefaults.activeProfile.id;
+    browser.storage.local.get("preferences").then(result => {
+        const prefs = result.preferences;
+
+        const index = prefs.findIndex(el => el.id == activeProfileID);
+        prefs[index].profile = defaults.profile;
+        prefs[index].length = defaults.length;
+        prefs[index].encoding = defaults.encoding;
+        prefs[index].save_preferences = defaults.save_preferences;
+        prefs[index].inject_into_content = defaults.inject_into_content;
+        prefs[index].copy_to_clipboard = defaults.copy_to_clipboard;
+
+        browser.storage.local.set({preferences: prefs});
+    });
 }
 
-function insertIndiPrefsIntoDB(indiPrefsArray){
+//this is for changing the database when we change the table in the UI
+async function refillIndiPrefsOfProfileInDB(indiPrefsArray){
+    //get the storageid
+    const storage_id = allProfilesDefaults.activeProfile.id;
+
     const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
     const objStore = transaction.objectStore("preferences");
 
     /*TODO encrypt if needed*/
-    const dataToStore = allPreferencesArray;
+    let dataToStore = indiPrefsArray;
     if(allProfilesDefaults.activeProfile.encrypt){
-
+        dataToStore = await encrypt(encryptionPassword.password, dataToStore);
     }
-    objStore.put(dataToStore, allProfilesDefaults.activeProfile.id);
+
+    return objStore.put(dataToStore, storage_id);
 
     //check each preference for its data validity adn reject any that are invalid
     //i.e. encoding - at least one has to be true, domain must be a valid url,
@@ -99,6 +129,43 @@ function insertIndiPrefsIntoDB(indiPrefsArray){
     // });
     //
     // reloadDatabaseAndDisplay();
+}
+
+//this is for importing into the database
+async function putIndiPrefsForProfileInDB(indiPrefsArray){
+    //first get them all out
+    try {
+        let prefs = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaults.activeProfile.id, allProfilesDefaults.activeProfile.encrypt, encryptionPassword.password); //TODO revise if the password will always match
+
+        indiPrefsArray.forEach(indiPref => {
+            let indexFound = prefs.findIndex(el => el.domain == indiPref.domain);
+
+            if(indexFound == -1){ //does NOT exist in the database, add it
+                prefs.push(indiPref);
+            }
+            else{
+                prefs[indexFound] = indiPref;
+            }
+
+        });
+
+        //sort the array by service and domain
+        prefs.sort((firstEl, secondEl) => {
+            let serviceToService = firstEl.service.localeCompare(secondEl.service);
+            if(serviceToService != 0){
+                return serviceToService;
+            }
+            else {
+                return firstEl.domain.localeCompare(secondEl.domain);
+            }
+        });
+
+        console.log(prefs);
+        return refillIndiPrefsOfProfileInDB(prefs);
+    }
+    catch (e) {
+        console.log(e);
+    }
 }
 
 //take the error place and append some error elements with children
@@ -839,11 +906,11 @@ function displayPreferences(prefArray){
 
 function saveModifiedTable(){
     console.log(`saving the modified preferences into the database`);
-    insertIndiPrefsIntoDB(allPreferencesArray);
+    refillIndiPrefsOfProfileInDB(allPreferencesArray);
 }
 
 // --------------------------- EXPORTING AND IMPORTING ------------------------------
-async function getExportObject(){
+async function getExportData(){
     // const defaults = await browser.storage.local.get("preferences");
     // const indiPrefs = await getPreferencesFromDB();
 
@@ -861,9 +928,29 @@ async function exportPreferences() {
         return;
     }
 
-    const exportObject = await getExportObject();
+    const exportObject = {};
+    const exportData = await getExportData();
+    //see the checkbox whether the user wants to encrypt
+    //if yes, prompt the password
+    //then stringify the exportobject and have it encrypted
+    const exportEncrypted = document.getElementById("encrypt_export-checkbox").checked;
+    if(exportEncrypted){
+        password_for_encryption = prompt("Enter password for encryption");
 
-    document.getElementById("database-result").innerHTML = JSON.stringify(exportObject, null, 4);
+        //await encryption here
+        let encryptedData = await encrypt(password_for_encryption, JSON.stringify(exportData));
+        console.log(encryptedData);
+
+        document.getElementById("database-result").innerText = encryptedData;
+
+        exportObject.encrypted = true;
+        exportObject.data = encryptedData;
+    }
+    else{
+        exportObject.data = exportData;
+    }
+
+    //document.getElementById("database-result").innerHTML = JSON.stringify(exportData, null, 4);
 
     const blob = new Blob([JSON.stringify(exportObject, null, 4)], {type: 'application/json'});
     var url = URL.createObjectURL(blob);
@@ -899,23 +986,40 @@ function importSettings(event){
     var reader = new FileReader();
     reader.readAsText(file);
 
-    reader.onload = function(event){
+    reader.onload = async function(event){
         const content = event.target.result;
-        document.getElementById("database-result").innerHTML = content;
 
         try {
             let importedJSON = JSON.parse(content);
 
-            if(!isValidImportedJSON(importedJSON)){
+
+            let data;
+            if(importedJSON.hasOwnProperty("encrypted") && importedJSON.encrypted == true){
+                console.log(`data is encrypted... ${importedJSON.data}`);
+                //decrypt the data first
+                let password = prompt("Enter a password to decrypt the message");
+                let decryptedData = await decrypt(password, importedJSON.data);
+                data = JSON.parse(decryptedData);
+            }
+            else {
+                data = importedJSON.data;
+            }
+
+            if(!isValidImportedJSON(data)){
                 displayError("Invalid format of preferences.")
                 return;
             }
 
-            //fill the default preferences
-            insertDefaultSettings(importedJSON.default_preferences);
-
-            //pass it to the function that will put the objects int the database
-            insertIndiPrefsIntoDB(importedJSON.individual_preferences);
+            // document.getElementById("database-result").innerHTML = JSON.stringify(data, null, 4);
+            // //fill the default preferences
+            // insertDefaultSettings(importedJSON.default_preferences);
+            insertDefaultSettings(data.default_preferences);
+            //
+            // //pass it to the function that will put the objects int the database
+            // insertIndiPrefsIntoDB(importedJSON.individual_preferences);
+            putIndiPrefsForProfileInDB(data.individual_preferences).then(e => {
+                initialize();
+            });
         }
         catch (error){
             displayError("Error parsing the JSON file.");
@@ -968,6 +1072,9 @@ function downloadFromGDrive(){
 async function encryptionPasswordInputHandler(){
     const input = document.getElementById("profile_encryption_pwd-input");
     const password = input.value;
+
+    encryptionPassword.password = password;
+    encryptionPassword.profile_id = allProfilesDefaults.activeProfile.id;
 
     allPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaults.activeProfile.id, password);
 }
@@ -1028,7 +1135,7 @@ async function initialize(){
         document.getElementById("encryption_password-container").hidden = false;
     }
     else {
-        allPreferencesArray = tempAllPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaultPreferences.activeProfile.id);
+        allPreferencesArray = tempAllPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaultPreferences.activeProfile.id, false, "");
         displayPreferences(tempAllPreferencesArray);
     }
 

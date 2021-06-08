@@ -95,6 +95,10 @@ main {
     font-size: 18px;
 }
 
+.material-icons.dim-on-hover:hover{
+    color:lightslategrey;
+}
+
 .label-tag-row{
     position: relative;
     display: flex;
