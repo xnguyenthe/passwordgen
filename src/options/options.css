@@ -1,17 +1,47 @@
+.all-profiles-container {
+    display: grid;
+    grid-template-columns: auto auto;
+    row-gap: 0.2em;
+    justify-content: space-between;
+    margin: 1em;
+}
+
+.export-section-container {
+    display: grid;
+    grid-template-columns: auto auto;
+    row-gap: 0.5em;
+    justify-content: space-between;
+    margin: 1em;
+}
+
+.import-section-container{
+    display: grid;
+    grid-template-columns: auto auto;
+    row-gap: 0.5em;
+    justify-content: space-between;
+    margin: 1em;
+}
+
+.encryption_password-container {
+    background-color: lightcoral;
+    padding: 1em;
+    margin: 0.5em;
+}
+
 .material-icons.md-18 { font-size: 18px; }
 
-input[type=text] {
+table input[type=text] {
     /*width: 12em;*/
     width: 90%;
 }
 
-input.number {
+table input.number {
     box-sizing: border-box;
     text-align: center;
     width: 3em;
 }
 
-input {
+table input {
     margin: auto;
     width: 80%;
     border: 0;

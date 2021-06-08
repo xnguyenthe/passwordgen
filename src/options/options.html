@@ -13,29 +13,54 @@
 <body>
     <h1>Options page</h1>
     <div id="errors-container"></div>
-    <p>Here you will find the settings for the following things:</p>
-    <ul>
-        <li>"User/Password" profiles (changing profile names, creating profiles, and deleting them).</li>
-        <li>Import/Export a file with default preferences and individual password preferences.</li>
-        <li>Using GoogleDrive to upload aforementioned file and download it for syncing purposes.</li>
-        <li>Table with all the stored individual preferences as per the user profile.</li>
-    </ul>
-
-    <h4>Profile 1</h4>
-    <button id="export-btn">Export</button>
-    <input id="import-btn" type="file" name="Import"/>
-    <button id="upload-to-gdrive-btn">Upload backup to google Drive</button>
-    <button id="download-from-gdrive-btn">Download backup from Google Drive</button>
-
+<!--    <p>Here you will find the settings for the following things:</p>-->
+<!--    <ul>-->
+<!--        <li>"User/Password" profiles (changing profile names, creating profiles, and deleting them).</li>-->
+<!--        <li>Import/Export a file with default preferences and individual password preferences.</li>-->
+<!--        <li>Using GoogleDrive to upload aforementioned file and download it for syncing purposes.</li>-->
+<!--        <li>Table with all the stored individual preferences as per the user profile.</li>-->
+<!--    </ul>-->
     <section>
-        <h3>Stored preferences for domains</h3>
-        <button id="delete-all-btn">Delete All Stored Preferences</button>
-        <button id="save_changes-btn">Save changes</button>
-        <a href="#" id="restore_changes-btn">Restore</a>
-        <section id="table-container">
-            <table id="table"></table>
-        </section>
-        <pre id="database-result"></pre>
+        <h2>All profiles</h2>
+        <div id="all-profiles" class="all-profiles-container"></div>
     </section>
+
+    <h2>Individual Profiles</h2>
+    <div>
+        <select id="profile-select"></select>
+        <input id="encrypt-profile-checkbox" type="checkbox"/>
+        <label for="encrypt-profile-checkbox">Encrypt profile</label>
+    </div>
+    <div class="encryption_password-container">
+        <p>Please Enter your encryption password first!</p>
+        <input id="profile_encryption_pwd-input" type="password" />
+        <input id="profile_encryption_pwd-submit" type="submit" value="Enter"/>
+    </div>
+    <div>
+        <h4>Export:</h4>
+        <div class="export-section-container">
+            <label for="encrypt_export-checkbox">Encrypt file before exporting</label>
+            <input id="encrypt_export-checkbox" type="checkbox"/>
+
+            <button id="export-btn">Export to file</button>
+            <button id="upload-to-gdrive-btn">Upload backup to Google Drive</button>
+        </div>
+        <h4>Import:</h4>
+        <div class="import-section-container">
+            <input id="import-btn" type="file" name="Import"/>
+            <button id="download-from-gdrive-btn">Download backup from Google Drive</button>
+        </div>
+
+        <section>
+            <h3>Stored preferences for domains</h3>
+            <button id="delete-all-btn">Delete All Stored Preferences</button>
+            <button id="save_changes-btn">Save changes</button>
+            <a href="#" id="restore_changes-btn">Restore</a>
+            <section id="table-container">
+                <table id="table"></table>
+            </section>
+            <pre id="database-result"></pre>
+        </section>
+    </div>
 </body>
 </html>

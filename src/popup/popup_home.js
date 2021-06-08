@@ -63,14 +63,21 @@ function openIndiPrefDB(){
 
 }
 
-/*return a promise that resolves witht the preference of the active profile*/
-function getActiveProfilePreference(){
-    return browser.storage.local.get("profiles")
-        .then(result => result.profiles.activeProfile)
-        .then(activeProfileId => {
-            return browser.storage.local.get("preferences").then(result => {
-                return result.preferences.find(el => el.id == activeProfileId);
-            });
+/*return a promise that resolves with an object that contains the preferences for the active profile, and an array containing the preferences of all profiles*/
+function getDefaultPreferences(){
+    console.log(`Getting default preferences of all profiles...`);
+    return browser.storage.local.get(["profiles", "preferences"])
+        .then(result => {
+            let activeProfileId = result.profiles.activeProfile;
+            let activeProfile = result.preferences.find(el => el.id == activeProfileId);
+            console.log(`The active profile is ${activeProfileId}, here is the active profile:`);
+            console.log(activeProfile);
+            console.log(`Here are all the profiles: `);
+            console.log(result.preferences);
+            return {
+                activeProfile: activeProfile,
+                allPreferencesArray: result.preferences
+            };
         });
 }
 
@@ -98,6 +105,9 @@ function getAllIndiPrefsForActiveProfile(db, profilePreference){
                 resolve([]);
                 return;
             }
+            // if(Object.keys(result).length == 0){
+            //     resolve([]);
+            // }
 
             //if encrypted then decrypt
             if(profilePreference.encrypt === true){
@@ -450,10 +460,29 @@ function getAllServiceNames(){
     });
 }
 
+function getSubdomainsOptions(domain, service_name){
+    var splittedDomain = domain.split(".");
+    var subdomains = splittedDomain.slice(0, splittedDomain.indexOf(service_name)); // array of subdomains without public suffix
+
+    var optionstring = new String();
+    let result = [];
+    for (var i = subdomains.length - 1; i >= 0; i--) {
+        optionstring = subdomains[i] + optionstring;
+        result.push(optionstring);
+        optionstring = "." + optionstring;
+    }
+    return result;
+}
+
 function displayUIDetails(allServicesArray){
     //"generate and save" button
     if(DOM_store_preference.checked){
         document.getElementById("home-generate_password-btn").innerText = "Generate & Save";
+        document.getElementById("toggle-save-preference-btn").innerText = "bookmark_add";
+    }
+    else{
+        document.getElementById("home-generate_password-btn").innerText = "Generate";
+        document.getElementById("toggle-save-preference-btn").innerText = "bookmark_border";
     }
 
     //show "these are saved preferences" badges
@@ -493,7 +522,7 @@ function setPasswordPreferencesInHomepageUI(prefs){
 }
 
 function fillProfileSelect(preferences, activeProfileId){
-    const select = document.getElementById("heading-user_select");
+    const select = document.getElementById("heading-profile_select");
     select.innerHTML = "";
 
     preferences.forEach(el => {
@@ -510,6 +539,7 @@ function fillProfileSelect(preferences, activeProfileId){
 //load the database with rules and load the pub suffix list
 //load the preferences
 async function initialize(){
+    console.log(`Initializing!`);
 
     //catch the errors here too!
     suffListData = await browser.storage.local.get("publicsuffix").then(result => result.publicsuffix.data);
@@ -522,7 +552,9 @@ async function initialize(){
     //get the active profile
     //determine if it's encrypted - if yes, show the encrypted page
     //if not just show the regular page
-    preferencesDefault = await getActiveProfilePreference();
+    const preferences = await getDefaultPreferences();
+    preferencesDefault = preferences.activeProfile;
+    console.log(preferences);
     if(preferencesDefault.encrypt == true){
 
     }
@@ -530,14 +562,15 @@ async function initialize(){
 
     }
 
-    //get the list of profiles
-    const preferenceProfiles = await browser.storage.local.get("preferences")
-        .then(result => result.preferences);
+    fillProfileSelect(preferences.allPreferencesArray, preferences.activeProfile.id);
 
-    fillProfileSelect(preferenceProfiles, preferencesDefault.id);
 
     //fill the user select in html document
-    indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault);
+    try {
+        indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault);
+    }catch (error){
+        console.log(error);
+    }
 
 
     //catch errors here too
@@ -585,6 +618,10 @@ async function initialize(){
     DOM_store_preference.checked = prefDefault.save_preferences;
 
     //ADDING THE AUTOFILL
+    const subdomainslist = getSubdomainsOptions(domain);
+    console.log(`Subdomains options: `);
+    console.log(subdomainslist, service_name);
+
     const allServicesArray = getAllServices();
 
     displayUIDetails(allServicesArray);
@@ -616,6 +653,14 @@ function displayPotentialChangeInStorageWarning(argument){
     else {
         document.getElementById("home-update_warning-container").hidden = true;
     }
+}
+
+function copyGeneratePwdToClipboard(){
+    console.log(`Copying generated password to clipboard...`);
+    DOM_generated_password.type = "text";
+    DOM_generated_password.select();
+    document.execCommand("copy");
+    DOM_generated_password.type = "password";
 }
 
 function generatePasswordHandler(event){
@@ -664,11 +709,7 @@ function generatePasswordHandler(event){
         }
 
         if(preferencesDefault.copy_to_clipboard){
-            console.log(`Copying generated password to clipboard...`);
-            DOM_generated_password.type = "text";
-            DOM_generated_password.select();
-            document.execCommand("copy");
-            DOM_generated_password.type = "password";
+            copyGeneratePwdToClipboard();
         }
     });
 
@@ -719,9 +760,11 @@ async function changeInServiceNameHandler(event){
 function potentialUpdateOfPreferencesHandler(){
     if(DOM_store_preference.checked){
         document.getElementById("home-generate_password-btn").innerText = "Generate & Save";
+        document.getElementById("toggle-save-preference-btn").innerText = "bookmark_add";
     }
     else {
         document.getElementById("home-generate_password-btn").innerText = "Generate";
+        document.getElementById("toggle-save-preference-btn").innerText = "bookmark_border";
     }
 
     //compare the preferences in the UI with
@@ -748,6 +791,54 @@ function potentialUpdateOfPreferencesHandler(){
     }
 }
 
+function profileChangeHandler(event){
+    const select = event.target;
+    const newActiveProfileID = select.value;
+    console.log(`New activeProfile ID will be: ${newActiveProfileID}`);
+
+    //set the default profile to a new one, reload
+    browser.storage.local.get("profiles").then(result => {
+        let profiles = result.profiles;
+
+        profiles.activeProfile = newActiveProfileID;
+
+        console.log(profiles);
+        browser.storage.local.set({profiles: profiles}).then(result => {
+            showPopupHome();
+            initialize();
+        });
+    });
+}
+
+let qrcode;
+function showQRCode(){
+    if(DOM_generated_password.value == ""){
+        return;
+    }
+
+    const underlay = document.getElementById("qrcode-underlay");
+    const qrcode_container = document.getElementById("qrcode");
+
+    underlay.hidden = false;
+    underlay.addEventListener("click", function (){
+        underlay.hidden = true;
+        qrcode.clear();
+        qrcode_container.innerHTML = "";
+    });
+
+    qrcode = new QRCode(qrcode_container, {
+        text: DOM_generated_password.value,
+        width: 128,
+        height: 128
+    });
+    // }
+
+    // window.setTimeout(function(){
+    //     qrcode_container.innerHTML = "";
+    //     underlay.hidden = true;
+    //     }, 5000);
+}
+
 // ------------------------- FUNCTION CALLS AND EVENT LISTENERS ----------------------------
 initialize();
 
@@ -758,14 +849,15 @@ DOM_user_password.addEventListener("keypress", function(e){
     }
 });
 document.getElementById("home-generate_password-btn").addEventListener("click", generatePasswordHandler);
-document.getElementById("toggle-show-pwd").addEventListener("click", function(){
+document.getElementById("toggle-show-pwd-btn").addEventListener("click", function(event){
+    const span = event.target;
     if(DOM_generated_password.type == "password" && DOM_generated_password.value != "") {
         DOM_generated_password.type = "text";
-        document.getElementById("icon-pwd-visible").innerText = "visibility";
+        span.innerText = "visibility";
     }
     else {
         DOM_generated_password.type = "password";
-        document.getElementById("icon-pwd-visible").innerText = "visibility_off";
+        span.innerText = "visibility_off";
     }
 });
 DOM_password_length.oninput = function(){
@@ -784,24 +876,11 @@ document.querySelectorAll('#home-pwd_options input').forEach(e => {
 });
 DOM_store_preference.addEventListener("click", potentialUpdateOfPreferencesHandler);
 
-let qrcode;
-document.getElementById("home-qr_code-btn").addEventListener("click", function(){
-    const qrcode_container = document.getElementById("qrcode");
+document.getElementById("heading-profile_select").addEventListener("change", profileChangeHandler);
 
-    // if(qrcode){
-    //     qrcode.clear();
-    //     qrcode.makeCode(DOM_generated_password.value);
-    // }
-    // else {
-        qrcode = new QRCode(qrcode_container, {
-            text: DOM_generated_password.value,
-            width: 128,
-            height: 128
-        });
-    // }
+document.getElementById("home-qr_code-btn").addEventListener("click", showQRCode);
 
-    window.setTimeout(function(){qrcode_container.innerHTML = "";}, 3000);
-});
+document.getElementById("copy-generated-pwd-btn").addEventListener("click", copyGeneratePwdToClipboard);
 /*TO-DO:
 * handle change in service name - validate and then find in database to load the preferences if they exist
 * //validate input - password and at least one character set
@@ -824,3 +903,5 @@ document.getElementById("home-qr_code-btn").addEventListener("click", function()
 * alert the user to the fact that these domains are different and that he will need to save on of them under a separate service name.
 * */
 
+//TODO: deal with incognito mode
+//TODO: localize!!!

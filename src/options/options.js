@@ -7,16 +7,18 @@ let tempAllPreferencesArray;
 
 let allProfilesDefaults;
 
+let encryptionPassword; //initialized when the password profile that is selected is encrypted, and the user enters a password
+
 // --------------------- HELPER FUNCTIONS ------------------------------
 /*return a promise that resolves with an object that contains the preferences for the active profile, and an array containing the preferences of all profiles*/
 function getDefaultPreferences(){
     return browser.storage.local.get(["profiles", "preferences"])
         .then(result => {
             let activeProfileId = result.profiles.activeProfile;
-            let activeProfile = result.preferences.find(el => el.id === activeProfileId);
+            let activeProfile = result.preferences.find(el => el.id == activeProfileId);
             return {
                 activeProfile: activeProfile,
-                allPreferencesArray: result.preferences
+                allProfiles: result.preferences
             };
         });
 }
@@ -62,11 +64,15 @@ function getAllPrefsForProfileFromDB(db, storage_id){
         }
 
         request.onsuccess = function(event){
-            console.log(`Success!`);
+            console.log(`Preferences for ${storage_id} are:`);
             console.log(event.target.result);
-            resolve(event.target.result);
+            if(event.target.result === undefined){
+                resolve([]);
+            }
+            else{
+                resolve(event.target.result);
+            }
         }
-
     });
 }
 
@@ -227,6 +233,208 @@ function isValidImportedJSON(object){
     return true;
 }
 
+// ----------------------- PROFILES MANAGEMENT -----------------------------
+function isProfileNameValid(name){
+    if(name.length > 20){
+        return false;
+    }
+
+    //TODO: check if name already exists
+    return true;
+}
+
+async function addProfile(){
+    //check if there are more than 10 profiles
+    //create a new profile in preferences, and also a new entry in profiles
+    const new_preference = {
+        //maybe add a name here, preferences might be an array with multiple preferences per user
+        profile: "Profile_Name",
+        length: "64",
+        constant: "ChAnge_ME!!!",
+        encoding: {"lower" : true, "upper": true, "num": true, "special": true},
+        save_preferences: false,
+        inject_into_content: true,
+        copy_to_clipboard: false,
+        encrypt: false,
+        enc_salt: {},
+        id: Date.now()
+    }
+
+    await browser.storage.local.get(["preferences", "profiles"]).then(result => {
+        const prefs = result.preferences;
+        const profiles = result.profiles;
+
+        if(prefs.length == 10){
+            //TODO: display error too many profiles
+            return;
+        }
+
+        prefs.push(new_preference);
+        profiles.profileToStorageLookup.push({profile_id: new_preference.id, storage_id: new_preference.id});
+
+        browser.storage.local.set({preferences: prefs, profiles: profiles});
+    });
+
+    //create a new database entry for this profile
+    try{
+        const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+        const objStore = transaction.objectStore("preferences");
+
+        objStore.put([], new_preference.id);
+    }catch(error){
+        console.log(error);
+    }
+
+    // //reload all profiles and redisplay
+    // allProfilesDefaults.allProfiles.push(new_preference);
+    // displayProfiles();
+
+    initialize();
+}
+
+function logStorageContents(){
+    browser.storage.local.get(result => console.log(result));
+}
+
+function changeProfileName(event){
+    const input = event.target;
+
+    const profile_id = input.dataset.id;
+    const new_profile_name = input.value.trim();
+
+    if(!isProfileNameValid(new_profile_name)){
+        //TODO: display error message for invalid name
+        input.value = input.dataset.name;
+        return;
+    }
+
+    console.log(`Profile with ID ${profile_id} to change its name to [${new_profile_name}]`);
+
+    browser.storage.local.get("preferences").then(result => {
+        const prefs = result.preferences;
+
+        const indexToBeChanged = prefs.findIndex(el => el.id == profile_id);
+
+        prefs[indexToBeChanged].profile = new_profile_name;
+
+        browser.storage.local.set({preferences: prefs});
+    });
+}
+
+async function deleteProfile(event){
+    const deleteIcon = event.target;
+    const profileID_toDelete = deleteIcon.dataset.id;
+
+    if(!confirm("Are you sure you want to delete?")){
+        return;
+    }
+
+
+    //get the id of the profile
+    //if it's the last profile only delete the database entry
+    if(allProfilesDefaults.allProfiles.length < 2) {
+        //delete all the database entries, set the default preferences back to default
+        await browser.storage.local.get("preferences").then(result => {
+            const prefs = result.preferences;
+
+            const indexInProfileList = prefs.findIndex(el => el.id == profileID_toDelete);
+            prefs[indexInProfileList].length = 64;
+            prefs[indexInProfileList].constant = "ChAnge_ME!!!";
+            prefs[indexInProfileList].encoding = {"lower" : true, "upper": true, "num": true, "special": true};
+            prefs[indexInProfileList].save_preferences = false;
+            prefs[indexInProfileList].inject_into_content = true;
+            prefs[indexInProfileList].copy_to_clipboard = false;
+            prefs[indexInProfileList].encrypt = false;
+            prefs[indexInProfileList].enc_salt = {};
+
+
+            browser.storage.local.set({preferences: prefs});
+        });
+
+        try{
+            const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+            const objStore = transaction.objectStore("preferences");
+
+            objStore.put({}, profileID_toDelete);
+        }catch (e) {
+            console.log(e);
+        }
+    }
+    else {
+        await browser.storage.local.get(["preferences", "profiles"]).then(result => {
+            const prefs = result.preferences;
+            const profiles = result.profiles;
+
+            if(profileID_toDelete == profiles.activeProfile){
+                profiles.activeProfile = prefs[0].id;
+            }
+            const indexInLookup = profiles.profileToStorageLookup.findIndex(el => el.profile_id == profileID_toDelete);
+            profiles.profileToStorageLookup.splice(indexInLookup, 1);
+
+            const indexInProfileList = prefs.findIndex(el => el.id == profileID_toDelete);
+            prefs.splice(indexInProfileList, 1);
+
+            browser.storage.local.set({preferences: prefs, profiles: profiles});
+        });
+
+        //delete the database entry
+        try{
+            const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+            const objStore = transaction.objectStore("preferences");
+
+            objStore.delete(profileID_toDelete);
+        }catch (e) {
+            console.log(e);
+        }
+    }
+
+    //if there are more profiles, delete from the profiles array in preferences, delete from the profiles, and delete the database entry
+
+    //if it's the active profile, change the active profile to smth else
+
+    //reload and display again
+    initialize(); //TODO: async, so wait for the other operations to finish before we reload the entire page
+}
+
+function displayProfiles(){
+    let allProfiles = allProfilesDefaults.allProfiles;
+    console.log(`These are all the profiles: `);
+    console.log(allProfiles);
+
+    const DOM_all_profiles = document.getElementById("all-profiles");
+    DOM_all_profiles.innerHTML = "";
+
+    allProfiles.forEach(profile => {
+        let input = document.createElement("input");
+        input.value = profile.profile;
+        input.dataset.id = profile.id;
+        input.dataset.name = profile.profile;
+        input.addEventListener("change", changeProfileName);
+
+        let span = document.createElement("span");
+        span.innerText = "delete";
+        span.classList.add("pointer", "material-icons");
+        span.dataset.id = profile.id;
+        span.addEventListener("click", deleteProfile);
+
+        DOM_all_profiles.append(input, span);
+    });
+
+    //add the input field and button for adding a new profile
+    if(allProfiles.length < 10){
+        // let input = document.createElement("input");
+        // input.type = "text";
+        // input.placeholder = "New Profile";
+        // input.id = "create_profile-btn";
+        let span = document.createElement("span");
+        span.classList.add("material-icons", "pointer");
+        span.addEventListener("click", addProfile);
+        span.innerText = "person_add";
+
+        DOM_all_profiles.append(span);
+    }
+}
+
 // ------------------------ MODiFYING THE TABLE ----------------------------
 
 /*sort the preferences array by service first and then by domain*/
@@ -290,26 +498,6 @@ function changePasswordSettings(event){
             return false;
         }
     });
-    //load all the database objects of this service and update them accordingly
-    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    // const objStore = transaction.objectStore("preferences");
-    //
-    // const index = objStore.index("service");
-    // const keyRange = IDBKeyRange.only(service);
-    // index.openCursor(keyRange).onsuccess = function(event){
-    //     const cursor = event.target.result;
-    //     if(cursor){
-    //         const prefToUpdate = cursor.value;
-    //
-    //         prefToUpdate.encoding = encoding;
-    //         prefToUpdate.length = len;
-    //         prefToUpdate.constant = constant;
-    //
-    //         console.log(`Updating the preferences for the domain: ${prefToUpdate.domain}`);
-    //         objStore.put(prefToUpdate);
-    //         cursor.continue();
-    //     }
-    // }
 }
 
 /* Change all preferences under a particular service to a new service name. If the new service name already exists, it will also rewrite all the
@@ -356,35 +544,6 @@ function changeServiceName(event){
 
     displayPreferences(allPreferencesArray);
 
-
-    //load all the database objects of this service and update them accordingly
-    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    // const objStore = transaction.objectStore("preferences");
-    //
-    // const index = objStore.index("service");
-    // const keyRange = IDBKeyRange.only(service);
-    // index.openCursor(keyRange).onsuccess = function(event){
-    //     const cursor = event.target.result;
-    //     if(cursor){
-    //         const prefToUpdate = cursor.value;
-    //
-    //         prefToUpdate.service = new_service_name;
-    //
-    //         //if the new name already exists we have to change the preferences to match the preferences for that service
-    //         if(newServiceNameAlreadyExists){
-    //             prefToUpdate.length = newServiceNamePreference.length;
-    //             prefToUpdate.encoding = newServiceNamePreference.encoding;
-    //             prefToUpdate.constant = newServiceNamePreference.constant;
-    //         }
-    //
-    //         console.log(`Updating the preferences for the domain: ${prefToUpdate.domain}`);
-    //         objStore.put(prefToUpdate);
-    //         cursor.continue();
-    //     }
-    // }
-
-    //redraw the table
-    //reloadDatabaseAndDisplay();
 }
 
 /* Delete all preferences filed under a particular service. */
@@ -408,25 +567,6 @@ function deleteService(event){
     });
 
     displayPreferences(allPreferencesArray);
-
-
-    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    // const objStore = transaction.objectStore("preferences");
-    //
-    // const index = objStore.index("service");
-    // const keyRange = IDBKeyRange.only(service);
-    // index.openCursor(keyRange).onsuccess = function(event){
-    //     const cursor = event.target.result;
-    //     if(cursor){
-    //         const prefToDelete = cursor.value;
-    //
-    //         objStore.delete(prefToDelete.domain);
-    //         cursor.continue();
-    //     }
-    // }
-
-    //redraw the table
-    //reloadDatabaseAndDisplay();
 }
 
 /* Eject domain from the service it's filed under. This means changing the service name for the domain. */
@@ -448,21 +588,6 @@ function ejectDomain(event){
     sortAllPreferencesArray();
 
     displayPreferences(allPreferencesArray);
-
-    //get the object from the database and chnage the
-    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    // const objStore = transaction.objectStore("preferences");
-    //
-    // const request = objStore.get(domain);
-    // request.onsuccess = function(event){
-    //     const pref = event.target.result;
-    //
-    //     pref.service = pref.domain;
-    //
-    //     objStore.put(pref);
-    // }
-    //
-    // reloadDatabaseAndDisplay();
 }
 
 /*Delete the preference for a specific domain*/
@@ -474,24 +599,11 @@ function deleteDomain(event){
     allPreferencesArray.splice(elIndexToDelete, 1);
 
     displayPreferences(allPreferencesArray);
-
-    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    // const objStore = transaction.objectStore("preferences");
-    //
-    // objStore.delete(domain);
-    //
-    // reloadDatabaseAndDisplay();
 }
 
 function deleteAllStoredPreferences(){
     allPreferencesArray = [];
     displayPreferences(allPreferencesArray);
-
-    // const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    // const objStore = transaction.objectStore("preferences");
-    //
-    // objStore.clear();
-    // reloadDatabaseAndDisplay();
 }
 
 function toggleDomainsRow(event){
@@ -730,13 +842,17 @@ function saveModifiedTable(){
     insertIndiPrefsIntoDB(allPreferencesArray);
 }
 
-// async function reloadDatabaseAndDisplay(){
-//     const prefs = await getPreferencesFromDB();
-//     allPreferencesArray = prefs;
-//     displayPreferences(prefs);
-// }
-
 // --------------------------- EXPORTING AND IMPORTING ------------------------------
+async function getExportObject(){
+    // const defaults = await browser.storage.local.get("preferences");
+    // const indiPrefs = await getPreferencesFromDB();
+
+    return {
+        default_preferences: allProfilesDefaults.activeProfile,
+        individual_preferences: allPreferencesArray
+    };
+}
+
 async function exportPreferences() {
     const downLoadsPermitted = await browser.permissions.contains({permissions: ["downloads"]});
     if(!downLoadsPermitted){
@@ -745,13 +861,7 @@ async function exportPreferences() {
         return;
     }
 
-    const defaults = await browser.storage.local.get("preferences");
-    const indiPrefs = await getPreferencesFromDB();
-
-    const exportObject = {
-        default_preferences: defaults.preferences,
-        individual_preferences: indiPrefs
-    };
+    const exportObject = await getExportObject();
 
     document.getElementById("database-result").innerHTML = JSON.stringify(exportObject, null, 4);
 
@@ -816,16 +926,6 @@ function importSettings(event){
 }
 // ------------------------------- SYNCING WITH GOOGLE DRIVE -----------------------------
 
-async function getExportObject(){
-    const defaults = await browser.storage.local.get("preferences");
-    const indiPrefs = await getPreferencesFromDB();
-
-    return {
-        default_preferences: defaults.preferences,
-        individual_preferences: indiPrefs
-    };
-}
-
 function uploadToGDrive(){
     //prepare the content to upload
     //stringify it
@@ -864,18 +964,75 @@ function downloadFromGDrive(){
     );
 }
 
+//--------------------- MAIN FUNCTION AND EVENT HANDLERS -------------------------
+async function encryptionPasswordInputHandler(){
+    const input = document.getElementById("profile_encryption_pwd-input");
+    const password = input.value;
+
+    allPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaults.activeProfile.id, password);
+}
+
+function displayProfileSelect(profilesArray, activeProfileID){
+    const select = document.getElementById("profile-select");
+    select.innerHTML = "";
+
+    profilesArray.forEach(profile => {
+        let option = document.createElement("option");
+        option.value = profile.id;
+        option.innerText = profile.profile;
+        if(profile.id == activeProfileID){
+            option.selected = true;
+        }
+        select.append(option);
+    });
+}
+
+function changeActiveProfileHandler(event){
+    const select = event.target;
+    const newActiveProfileID = select.value;
+    console.log(`New activeProfile ID will be: ${newActiveProfileID}`);
+
+    //set the default profile to a new one, reload
+    browser.storage.local.get("profiles").then(result => {
+        let profiles = result.profiles;
+
+        profiles.activeProfile = newActiveProfileID;
+
+        console.log(profiles);
+        browser.storage.local.set({profiles: profiles}).then(result => {
+            initialize();
+        });
+    });
+}
 
 async function initialize(){
-    const IDBDatabeObject = await openIndiPrefDB();
-    indiPrefDB = IDBDatabeObject;
-
-    //get the active profile or whatever, decide which profile to get it from
+    //open the preferences - fill the preferences tab
     const allProfilesDefaultPreferences = await getDefaultPreferences();
     allProfilesDefaults = allProfilesDefaultPreferences;
 
-    allPreferencesArray = tempAllPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaultPreferences.activeProfile.id);
+    displayProfiles();
 
-    displayPreferences(tempAllPreferencesArray);
+    const IDBDatabeObject = await openIndiPrefDB();
+    indiPrefDB = IDBDatabeObject;
+
+    //zobraz select pre profilovu cast
+    //prepinanie aktivneho profilu profilov pre select
+    //export a import sa deje pre urcity akvitny profil
+    displayProfileSelect(allProfilesDefaults.allProfiles, allProfilesDefaults.activeProfile.id);
+
+
+
+    //if profile is encrypted, ask for the decryption password, if not, carry on displaying the preference table
+    if(allProfilesDefaultPreferences.activeProfile.encrypt == true){
+        //display the dialog for getting the password
+        document.getElementById("encryption_password-container").hidden = false;
+    }
+    else {
+        allPreferencesArray = tempAllPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaultPreferences.activeProfile.id);
+        displayPreferences(tempAllPreferencesArray);
+    }
+
+
 }
 
 initialize();
@@ -885,7 +1042,13 @@ document.getElementById("import-btn").addEventListener("change", importSettings)
 document.getElementById("delete-all-btn").addEventListener("click", deleteAllStoredPreferences);
 document.getElementById("upload-to-gdrive-btn").addEventListener("click", uploadToGDrive);
 document.getElementById("download-from-gdrive-btn").addEventListener("click", downloadFromGDrive);
+
 document.getElementById("save_changes-btn").addEventListener("click", saveModifiedTable);
+
+document.getElementById("profile_encryption_pwd-submit").addEventListener("click", encryptionPasswordInputHandler);
+
+document.getElementById("profile-select").addEventListener("change", changeActiveProfileHandler);
+
 
 /*
 * Bugs: first domain in the domain row, if there are multiple domains - the eject and delete buttons don't work - they don't have event listeners attached

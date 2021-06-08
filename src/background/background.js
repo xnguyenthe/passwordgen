@@ -98,7 +98,7 @@ function initDefaultPreferences() {
         encoding: {"lower" : true, "upper": true, "num": true, "special": true},
         save_preferences: false,
         inject_into_content: true,
-        copy_to_clipboard: true,
+        copy_to_clipboard: false,
         encrypt: false,
         enc_salt: {},
         id: Date.now()

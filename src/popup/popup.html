@@ -16,7 +16,7 @@
 <body>
     <header>
         <span id="heading_logo">PwdGen</span>
-        <select id="heading-user_select">
+        <select id="heading-profile_select">
             <option value="0">User 1</option>
             <option value="1">User 2</option>
             <option value="2">User 3</option>
@@ -76,19 +76,18 @@
                 </div>
                 <section id="save_and_generate_row">
                     <label for="home-save_this_preference" class="icon_container">
-                        <input id="home-save_this_preference" type="checkbox"/>
-                        <div id="icon_save"></div>
+                        <input id="home-save_this_preference" type="checkbox" hidden/>
+                        <span id="toggle-save-preference-btn" class="material-icons pointer">bookmark_border</span>
                     </label>
                     <button id="home-generate_password-btn">Generate</button>
                 </section>
                 <section id="show_password_qr_row">
-                    <button id="toggle-show-pwd"><span id="icon-pwd-visible" class="material-icons pointer">visibility_off</span></button>
+                    <span id="toggle-show-pwd-btn" class="material-icons pointer">visibility_off</span>
                     <input id="home-generated_password" type="password"/>
-                    <button id="home-qr_code-btn"><span class="material-icons pointer">qr_code</span></button>
-                    <span class="material-icons pointer">content_copy</span>
+                    <span id="home-qr_code-btn" class="material-icons pointer">qr_code</span>
+                    <span id="copy-generated-pwd-btn" class="material-icons pointer">content_copy</span>
                 </section>
             </div>
-            <div id="qrcode"></div>
         </div>
 
         <div id="popup-defaults" hidden>
@@ -170,8 +169,12 @@
         </div>
     </main>
     <footer>
-        <a id="btn-show-about" href="#">About</a>
-        <a id="btn-show-settings" href="#">Settings</a>
+        <span id="btn-show-about" class="material-icons pointer">info</span>
+        <span id="btn-show-settings" class="material-icons pointer">settings</span>
     </footer>
+
+    <div id="qrcode-underlay" class="qrcode-underlay" hidden>
+        <div id="qrcode"></div>
+    </div>
 </body>
 </html>
