@@ -113,6 +113,9 @@ function deleteEntryForProfileFromDB(storage_id){
                 }
                 cursor.continue();
             }
+            else {
+                resolve("done");
+            }
         }
     });
 }
@@ -126,7 +129,7 @@ function insertDefaultSettings(defaults){
         const prefs = result.preferences;
 
         const index = prefs.findIndex(el => el.id == activeProfileID);
-        prefs[index].profile = defaults.profile;
+        // prefs[index].profile = defaults.profile;
         prefs[index].length = defaults.length;
         prefs[index].encoding = defaults.encoding;
         prefs[index].save_preferences = defaults.save_preferences;
@@ -438,6 +441,7 @@ async function deleteProfile(event){
     //if it's the last profile only delete the database entry
     if(allProfilesDefaults.allProfiles.length < 2) {
         //delete all the database entries, set the default preferences back to default
+        console.log(`Only 1 profile left, changing the default settings of the profile back to default.`)
         await browser.storage.local.get("preferences").then(result => {
             const prefs = result.preferences;
 
@@ -484,6 +488,7 @@ async function deleteProfile(event){
 
             //if we're deleting an activeProfile, change activeProfile to the first in the array
             if(profileID_toDelete == profiles.activeProfile){
+                console.log(`Deleteing active profile ${profiles.activeProfile}: changing active profile to ${prefs[0].id}`);
                 profiles.activeProfile = prefs[0].id;
             }
             const indexInLookup = profiles.profileToStorageLookup.findIndex(el => el.profile_id == profileID_toDelete);
@@ -497,18 +502,13 @@ async function deleteProfile(event){
 
         //delete the database entry
         try{
-            deleteEntryForProfileFromDB(profileID_toDelete);
+            await deleteEntryForProfileFromDB(profileID_toDelete)
         }catch (e) {
             console.log(e);
         }
+
+        initialize();
     }
-
-    //if there are more profiles, delete from the profiles array in preferences, delete from the profiles, and delete the database entry
-
-    //if it's the active profile, change the active profile to smth else
-
-    //reload and display again
-    initialize(); //TODO: async, so wait for the other operations to finish before we reload the entire page
 }
 
 function displayProfiles(){
@@ -1298,8 +1298,10 @@ async function initialize(){
 
     displayProfiles();
 
-    const IDBDatabeObject = await openIndiPrefDB();
-    indiPrefDB = IDBDatabeObject;
+    if(indiPrefDB === undefined) {
+        const IDBDatabeObject = await openIndiPrefDB();
+        indiPrefDB = IDBDatabeObject;
+    }
 
     //zobraz select pre profilovu cast
     //prepinanie aktivneho profilu profilov pre select
@@ -1311,6 +1313,9 @@ async function initialize(){
         //display the dialog for getting the password
         document.getElementById("encryption_password-container").hidden = false;
         document.getElementById("individual_preferences_section").hidden = true;
+
+        document.getElementById("profile_encryption_pwd-input").value = "";
+        document.getElementById("profile_encryption_pwd-input").focus();
     }
     else {
         document.getElementById("encryption_password-container").hidden = true;
@@ -1335,6 +1340,7 @@ document.getElementById("download-from-gdrive-btn").addEventListener("click", do
 document.getElementById("save_changes-btn").addEventListener("click", saveModifiedTable);
 
 document.getElementById("profile_encryption_pwd-submit").addEventListener("click", encryptionPasswordInputHandler);
+document.getElementById("profile_encryption_pwd-input").addEventListener("change", encryptionPasswordInputHandler);
 
 document.getElementById("profile-select").addEventListener("change", changeActiveProfileHandler);
 

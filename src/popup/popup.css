@@ -17,6 +17,11 @@ body {
     transform: translate(-50%, -50%);
 }
 
+#popup-encryption_pwd {
+    width: 100%;
+    height: 100%;
+}
+
 header {
     background-color: darkslategrey;
     color: white;
@@ -28,6 +33,11 @@ header #heading_logo {
     font-weight: bold;
     font-size: 1.5em;
     cursor: pointer;
+}
+
+header #heading-profile_select {
+    float: right;
+    width: 10em;
 }
 
 .container {
