@@ -847,10 +847,13 @@ function showQRCode(){
     });
     // }
 
-    // window.setTimeout(function(){
-    //     qrcode_container.innerHTML = "";
-    //     underlay.hidden = true;
-    //     }, 5000);
+    window.setTimeout(function(){
+        if(qrcode_container.innerHTML != ""){
+            underlay.hidden = true;
+            qrcode_container.innerHTML = "";
+            qrcode.clear();
+        }
+        }, 5000);
 }
 
 // ------------------------- FUNCTION CALLS AND EVENT LISTENERS ----------------------------
