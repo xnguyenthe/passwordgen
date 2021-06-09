@@ -1,6 +1,7 @@
 body {
     width: 20em;
     position: relative;
+    box-sizing: border-box;
 }
 
 .qrcode-underlay {

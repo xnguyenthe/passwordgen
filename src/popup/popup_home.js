@@ -456,6 +456,9 @@ function displayUIDetails(allServicesArray){
         document.getElementById("toggle-save-preference-btn").innerText = "bookmark_border";
     }
 
+    document.getElementById("home-pwd_options").classList.remove("changed");
+    document.getElementById("home-pwd_options").classList.remove("from_storage");
+
     //show "these are saved preferences" badges
     if(isStored.domain){
        document.getElementById("stored_domain-tag").style.display = "inline";
@@ -482,15 +485,15 @@ function displayUIDetails(allServicesArray){
         option.value = service;
         datalist.append(option);
     });
-}
 
+    DOM_generated_password.value = "";
+    document.getElementById("home-update_warning-container").hidden = true;
+
+}
 
 // ----------------------- MAIN FUNCTION AND/OR EVENT HANDLERS DEFINITIONS ------------------------------
 async function initialize(){
     console.log(`Initializing!`);
-
-    //annull fields
-    DOM_generated_password.value = "";
 
     //catch the errors here too!
     suffListData = await browser.storage.local.get("publicsuffix").then(result => result.publicsuffix.data);
