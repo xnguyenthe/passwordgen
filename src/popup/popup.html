@@ -9,6 +9,7 @@
     <script defer src="punycode.js"></script>
     <script defer src="qrcode.js"></script>
 
+    <script defer src="../encrypt/pbkdf2.js"></script>
     <script defer src="popup_home.js"></script>
     <script defer src="popup_preferences.js"></script>
     <script defer src="popup_toggle_pages.js"></script>
@@ -16,17 +17,22 @@
 <body>
     <header>
         <span id="heading_logo">PwdGen</span>
-        <select id="heading-user_select">
+        <select id="heading-profile_select">
             <option value="0">User 1</option>
             <option value="1">User 2</option>
             <option value="2">User 3</option>
             <option value="3">User 4</option>
         </select>
-        <span id="btn-show-defaults"  class="material-icons pointer">tune</span>
+
     </header>
 
     <main>
         <div id="errors-container"> </div>
+        <div id="popup-encryption_pwd">
+            Enter password for decryption:
+            <input id="encryption_pwd-input" type="password"/>
+            <input id="encryption_pwd-submit"  type="submit" value="Enter"/>
+        </div>
         <div id="popup-home">
             <div class="container flex-column">
                 <div class="label-tag-row"><span id="home-domain-span">www.example.com</span><span id="stored_domain-tag" style="display:none" class="material-icons md-18">turned_in</span></div>
@@ -44,6 +50,7 @@
                 <!--   password generation options     -->
                 <div>
                     <span id="home-pwd_container-heading">Password options</span>
+                    <span id="btn-show-defaults"  class="material-icons pointer">tune</span>
                 </div>
                 <section id="home-pwd_options" class="pwd_options_container">
                     <input id="home-constant-input-hidden" type="text" hidden/>
@@ -76,19 +83,18 @@
                 </div>
                 <section id="save_and_generate_row">
                     <label for="home-save_this_preference" class="icon_container">
-                        <input id="home-save_this_preference" type="checkbox"/>
-                        <div id="icon_save"></div>
+                        <input id="home-save_this_preference" type="checkbox" hidden/>
+                        <span id="toggle-save-preference-btn" class="material-icons pointer dim-on-hover">bookmark_border</span>
                     </label>
                     <button id="home-generate_password-btn">Generate</button>
                 </section>
                 <section id="show_password_qr_row">
-                    <button id="toggle-show-pwd"><span id="icon-pwd-visible" class="material-icons pointer">visibility_off</span></button>
+                    <span id="toggle-show-pwd-btn" class="material-icons pointer dim-on-hover">visibility_off</span>
                     <input id="home-generated_password" type="password"/>
-                    <button id="home-qr_code-btn"><span class="material-icons pointer">qr_code</span></button>
-                    <span class="material-icons pointer">content_copy</span>
+                    <span id="home-qr_code-btn" class="material-icons pointer dim-on-hover">qr_code</span>
+                    <span id="copy-generated-pwd-btn" class="material-icons pointer dim-on-hover">content_copy</span>
                 </section>
             </div>
-            <div id="qrcode"></div>
         </div>
 
         <div id="popup-defaults" hidden>
@@ -125,6 +131,9 @@
                         <label for="defaults-pwd_length">password length</label>
                         <input id="defaults-pwd_length" name="pwd-length" class="defaults-input" type="number" min="4" max="64" value="10">
                     </div>
+                    <p>
+                        This default preference is loaded when no prior preference for the visited domain has been saved.
+                    </p>
                 </section>
                 <h4>After the password is generated:</h4>
                 <section class="default-store-inject-copy-options">
@@ -137,9 +146,6 @@
                     <input id="defaults-copy_pwd_to_clipboard-chckbx" name="copy-to-clipboard" class="defaults-input" type="checkbox" checked/>
                     <label for="defaults-copy_pwd_to_clipboard-chckbx">Automatically copy the generated password</label>
                 </section>
-                <p>
-                    This default preference is loaded when no prior preference for the visited domain has been saved.
-                </p>
             </div>
         </div>
 
@@ -170,8 +176,12 @@
         </div>
     </main>
     <footer>
-        <a id="btn-show-about" href="#">About</a>
-        <a id="btn-show-settings" href="#">Settings</a>
+        <span id="btn-show-about" class="material-icons pointer dim-on-hover">info</span>
+        <span id="btn-show-settings" class="material-icons pointer dim-on-hover">settings</span>
     </footer>
+
+    <div id="qrcode-underlay" class="qrcode-underlay" hidden>
+        <div id="qrcode"></div>
+    </div>
 </body>
 </html>
