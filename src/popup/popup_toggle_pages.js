@@ -1,3 +1,4 @@
+/** Click event Handler: Show the About page, and hide the Home and Default Settings pages*/
 function showPopupAbout(event){
     if(document.getElementById("popup-about").hidden) {
         document.getElementById("popup-home").hidden = true;
@@ -6,6 +7,7 @@ function showPopupAbout(event){
     }
 }
 
+/** Click Event handler: Show the Dafault Settings page and hide the About and Home pages*/
 function showPopupDefaults(event){
     if(document.getElementById("popup-defaults").hidden) {
         document.getElementById("popup-home").hidden = true;
@@ -16,6 +18,7 @@ function showPopupDefaults(event){
     }
 }
 
+/** Click Event handler: Show the Home page and hide the About and Default Settings pages*/
 function showPopupHome(event){
     if(document.getElementById("popup-home").hidden) {
         document.getElementById("popup-home").hidden = false;

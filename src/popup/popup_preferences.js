@@ -1,4 +1,5 @@
 //called when the preferences page is displayed (see popup_toggle_pages.js)
+/** Get the values of the inputs in the Default Settings of Popup, and set the DefaultPreferences for the relevant profile in browser.storage.local accordingly*/
 function displayCurrentDefaultPreferences(){
     browser.storage.local.get(["preferences", "profiles"]).then(result => {
         const prefs = result.preferences;
@@ -20,6 +21,7 @@ function displayCurrentDefaultPreferences(){
     });
 }
 
+/** Get DefaultPreferences for the relevant profile from browser.storage.local and set the inputs in the Default Settings in popup*/
 function updatePreferencesHandler(event){
     const element = event.target;
 

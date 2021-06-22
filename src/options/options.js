@@ -1,12 +1,19 @@
 // ------------------ GLOBAL VARIABLES
 const MAX_FILE_SIZE = 5;
+
+/**@type {IDBDatabase}*/
 let indiPrefDB;
 
+/** array of IndividualPreference objects
+ * @type {Array}*/
 let allPreferencesArray;
-let tempAllPreferencesArray;
+// let tempAllPreferencesArray;
 
+/** all the default preferences of all the profiles
+ * @type {AllDefaultPreferences}*/
 let allProfilesDefaults;
 
+/** @type{EncryptionPasswords}*/
 let encryptionPassword = {
     passwords: [], //contains {profile_id: id, password: password}
     getPasswordForID: function(id){
@@ -17,7 +24,8 @@ let encryptionPassword = {
 }; //initialized when the password profile that is selected is encrypted, and the user enters a password
 
 // --------------------- HELPER FUNCTIONS ------------------------------
-/*return a promise that resolves with an object that contains the preferences for the active profile, and an array containing the preferences of all profiles*/
+/** Get the default preferences of all profiles
+ * @returns {Promise} A promise which resolves with AllDefaultPreferences - an object containing the active profile's default preferences and an array of all profiles' default preferences*/
 function getDefaultPreferences(){
     return browser.storage.local.get(["profiles", "preferences"])
         .then(result => {
@@ -29,7 +37,10 @@ function getDefaultPreferences(){
             };
         });
 }
-
+/**
+ * Opens database
+ * @returns {Promise} Promise object representing the IDBDatabase object.
+ * */
 function openIndiPrefDB(){
     return new Promise((resolve, reject) => {
         const dbOpenRequest = window.indexedDB.open("IndiPref");
@@ -44,7 +55,7 @@ function openIndiPrefDB(){
     });
 }
 
-/**/
+/*debugging function*/
 function getEntireDB(){
     return new Promise((resolve) => {
         const transaction = indiPrefDB.transaction(["preferences"], "readonly");
@@ -66,6 +77,13 @@ function getEntireDB(){
     });
 }
 
+/**
+ * Get all the IndividialPreference objects from the db, decrypt them if needed.
+ * @param {IDBDatabase} db
+ * @param {number} storage_id - the id, which serves as the key in the database
+ * @param {boolean} encrypted - boolean value showing whether the profile is encrypted or not
+ * @param {string} password - the password with which to decrypt the data if needed
+ * @returns {Promise} Promise which represents the JSON Array of IndividualPreference objects*/
 function getAllPrefsForProfileFromDB(db, storage_id, encrypted, password){
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(["preferences"], "readonly");
@@ -99,7 +117,9 @@ function getAllPrefsForProfileFromDB(db, storage_id, encrypted, password){
         }
     });
 }
-
+/** Deletes the entry, given by its key, from the database.
+ * @param {number} storage_id - id of the entry to delete - this entry represents the entire set of individual preferences of a profile
+ * @returns {Promise} A promise representing the string "done"*/
 function deleteEntryForProfileFromDB(storage_id){
     return new Promise((resolve, reject) => {
         const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
@@ -120,6 +140,9 @@ function deleteEntryForProfileFromDB(storage_id){
     });
 }
 
+/** Set the default preferences for the active profile (in browser.storage.local).
+ * @param {DefaultPreferences} defaults - the new default preferences the active profile
+ * @returns {void}*/
 function insertDefaultSettings(defaults){
     //default settings for active profile
     //get active profile
@@ -141,11 +164,14 @@ function insertDefaultSettings(defaults){
 }
 
 //this is for changing the database when we change the table in the UI
+/** Take the array of IndividualPreference objects and put them all into the database. Encrypt them before putting them in the database if needed.
+ * This functions accesses the global variable allProfileDefaults and encryptionPassword and indiPrefDB.
+ * @param {Array} array of IndividualPreference
+ * @returns {IDBRequest} An IDBRequest object on which subsequent events related to this operation are fired.*/
 async function refillIndiPrefsOfProfileInDB(indiPrefsArray){
     //get the storageid
     const storage_id = allProfilesDefaults.activeProfile.id;
 
-    /*TODO encrypt if needed*/
     let dataToStore = indiPrefsArray;
     if(allProfilesDefaults.activeProfile.encrypt){
         console.log(`Encrypting data for the database using password for profile ${allProfilesDefaults.activeProfile.id}`);
@@ -167,6 +193,10 @@ async function refillIndiPrefsOfProfileInDB(indiPrefsArray){
 }
 
 //this is for importing into the database
+/** Gets the array of all IndividualPreference of the active profile from the DB, then takes a new Array of IndividualPreference objects
+ * and puts them one by in the original array. If a preference exists, it gets updated, if not, it is pushed in. Sorts the updated array and then puts it back in the database.
+ * @param {Array} array of IndividualPreference
+ * @returns {IDBRequest} An IDBRequest object on which subsequent events related to this operation are fired.*/
 async function putIndiPrefsForProfileInDB(indiPrefsArray){
     //first get them all out
     try {
@@ -206,6 +236,9 @@ async function putIndiPrefsForProfileInDB(indiPrefsArray){
 }
 
 //take the error place and append some error elements with children
+/** Takes an error message and displaus the error in the UI
+ * @param {string} error_text - error message
+ * @returns {void}*/
 function displayError(error_text){
     const errors_container = document.getElementById("errors-container");
 
@@ -244,10 +277,14 @@ function validateDomain(){
 
 }
 
+/** Validates the object, whether it complies with the format of our export/import objects.
+ * @returns {boolean} */
 function isValidImportedJSON(object){
     //import object must have 2 keys: default_preferences and individual_preferences
     //defaults must contain:
 
+    /** validates the PasswordEncoding object
+     * @returns {boolean}*/
     function isValidEncoding(encoding){
         if(encoding.lower === undefined || typeof encoding.lower !== "boolean" ||
             encoding.upper === undefined || typeof encoding.upper !== "boolean" ||
@@ -338,6 +375,9 @@ function isValidImportedJSON(object){
 }
 
 // ----------------------- PROFILES MANAGEMENT -----------------------------
+
+/** validates the porfile name - name has to be shorter than 20 characters long
+ * @returns {boolean} */
 function isProfileNameValid(name){
     if(name.length > 20){
         return false;
@@ -347,6 +387,9 @@ function isProfileNameValid(name){
     return true;
 }
 
+/** Event Handler. Creates a profile (if the total number of profiles is less than 10.) and adds it to the relevant browser.storage.local.
+ * After tge creation of the profile, it calles the initialize() function.
+ * @returns {void} */
 async function addProfile(){
     //check if there are more than 10 profiles
     //create a new profile in preferences, and also a new entry in profiles
@@ -397,10 +440,14 @@ async function addProfile(){
     initialize();
 }
 
+/*debugging function*/
 function logStorageContents(){
     browser.storage.local.get(result => console.log(result));
 }
 
+/** Event handler. Changes the name of the profile. then calls the initialize() function
+ * @param {Event} event- event that was fired. The target should contain the id of the profile to modify in its dataset.
+ * @returns {void}*/
 function changeProfileName(event){
     const input = event.target;
 
@@ -428,6 +475,9 @@ function changeProfileName(event){
     });
 }
 
+/** Event Handler. Deletes the profile. After deletion calls initialize().
+ * @param {Event} event - an event whose target containes in its dataset the id of the profile to delete.
+ * @returns {void}*/
 async function deleteProfile(event){
     const deleteIcon = event.target;
     const profileID_toDelete = deleteIcon.dataset.id;
@@ -511,6 +561,9 @@ async function deleteProfile(event){
     }
 }
 
+/** Takes all the DefaultPreferences objects of all profiles, and then displas the names of all the profiles in the UI as text input fields.
+ * This function accesses the allProfilesDefaults global variable.
+ * @returns {void}*/
 function displayProfiles(){
     let allProfiles = allProfilesDefaults.allProfiles;
     console.log(`These are all the profiles: `);
@@ -560,7 +613,8 @@ function displayProfiles(){
 
 // ------------------------ MODiFYING THE TABLE ----------------------------
 
-/*sort the preferences array by service first and then by domain*/
+/** Sort the global variable allPreferencesArray array by service first and then by domain
+ * @returns {void}*/
 function sortAllPreferencesArray(){
     allPreferencesArray.sort((firstEl, secondEl) => {
         let serviceToService = firstEl.service.localeCompare(secondEl.service);
@@ -573,7 +627,10 @@ function sortAllPreferencesArray(){
     });
 }
 
-/* Change the password settings of all the preference objects filed under a particular service*/
+/** Change the password settings of all the IndividualPreference objects filed under a particular service. This function modifies the allPreferencesArray global variable.
+ * @param {Event} event - event whose target contains the name of the service to be modified in its dataset attribute
+ * @returns {void}
+ * */
 function changePasswordSettings(event){
     const input = event.target;
     const service = input.dataset.service;
@@ -623,8 +680,12 @@ function changePasswordSettings(event){
     });
 }
 
-/* Change all preferences under a particular service to a new service name. If the new service name already exists, it will also rewrite all the
-* password preferences to match those of the existing service with the name we're changing to. */
+/** Change all IndividualPreferences under a particular service to a new service name. If the new service name already exists, it will also rewrite all the
+* password preferences to match those of the existing service with the name we're changing to. Afterwards calls sortAllPreferencesArray() and displayPreferences().
+ * This function modifies the allPreferencesArray global variable.
+ * @param {Event} event - event whose target contains the name of the service to be modified in its dataset attribute, and has the new name as its value
+ * @returns {void}
+ * */
 function changeServiceName(event){
     const input = event.target;
     const service = input.dataset.service;
@@ -669,7 +730,9 @@ function changeServiceName(event){
 
 }
 
-/* Delete all preferences filed under a particular service. */
+/** Delete all IndividualPreferences filed under a particular service. This function modifies the allPreferencesArray global variable. Afterwards calls displayPreferences().
+ * @param {Event} event - event whose target contains the service name to be deleted in its dataset attribute
+ * @returns {void}*/
 function deleteService(event){
     const service = event.target.dataset.service;
 
@@ -692,7 +755,10 @@ function deleteService(event){
     displayPreferences(allPreferencesArray);
 }
 
-/* Eject domain from the service it's filed under. This means changing the service name for the domain. */
+/** Eject domain from the service it's filed under. This means changing the service name for the domain. Then calls the sortAllPreferencesArray() and displayPreferences().
+ * This function modifies the allPreferencesArray global variable.
+ * @param {Event} event - event whose target contains the service name and the domain of the IndividualPreference in its dataset attribute
+ * @returns {void}*/
 function ejectDomain(event){
     const el = event.target;
     console.log(`Ejecting ${el.dataset.domain}`);
@@ -713,7 +779,9 @@ function ejectDomain(event){
     displayPreferences(allPreferencesArray);
 }
 
-/*Delete the preference for a specific domain*/
+/** Delete the IndividualPreference for a specific domain. This function modifies the allPreferencesArray global variable. Afterwards calls displayPreferences()
+ * @param {Event} event - event whose target contains the domain to be deleted in its dataset
+ * @returns {void}*/
 function deleteDomain(event){
     const domain = event.target.dataset.domain;
     console.log(`deleting domain: ${domain}`);
@@ -724,11 +792,16 @@ function deleteDomain(event){
     displayPreferences(allPreferencesArray);
 }
 
+/** Delete all IndividualPreference objects from the array. This means reassigning an empty array to the global variable allPreferencesArray. Afterwards calls displayPreferences()
+ * @returns {void}*/
 function deleteAllStoredPreferences(){
     allPreferencesArray = [];
     displayPreferences(allPreferencesArray);
 }
 
+/** Displays or hides the associated domains row.
+ * @param {Event} event - the event whose target is the button that was clicked
+ * @returns {void}*/
 function toggleDomainsRow(event){
     const plus = event.target;
     const nextRow = plus.parentElement.parentElement.nextElementSibling;
@@ -745,6 +818,9 @@ function toggleDomainsRow(event){
     }
 }
 
+/** Displays or hides all the associated domains rows.
+ * @param {Event} event - the event whose target is the button that was clicked
+ * @returns {void}*/
 function toggleAllDomainsRows(event){
     const expand = event.target;
 
@@ -764,6 +840,8 @@ function toggleAllDomainsRows(event){
     }
 }
 
+/** Takes an array of IndividualPreference objects and displays them as a formatted table.
+ * @param {Array} prefArray - an array of IndividualPreference objects*/
 function displayPreferences(prefArray){
     const table = document.getElementById("table");
     table.innerHTML = "";
@@ -960,12 +1038,18 @@ function displayPreferences(prefArray){
     });
 }
 
+/** calls the refillIndiPrefsOfProfileInDB() function and passes it the allPreferencesArray global variable in order to save the preferences back in the database.
+ * @returns {void}*/
 function saveModifiedTable(){
     console.log(`saving the modified preferences into the database`);
     refillIndiPrefsOfProfileInDB(allPreferencesArray);
 }
 
 // --------------------------- EXPORTING AND IMPORTING ------------------------------
+
+/** Gets the data to be exported, namely the default preferences of the profile, and its individual preferences. This function accesses the
+ * allProfilesDefaults and allPreferencesArray global variables. Returns them in a new object.
+ * @returns {$object} object containing the keys default_preferences and individual_preferences containing the aforementioned data.*/
 async function getExportData(){
     // const defaults = await browser.storage.local.get("preferences");
     // const indiPrefs = await getPreferencesFromDB();
@@ -976,6 +1060,8 @@ async function getExportData(){
     };
 }
 
+/** Uses browser,downloads to download the export object as a json object. Encrypts the data if necessary.
+ * @returns {void}*/
 async function exportPreferences() {
     const downLoadsPermitted = await browser.permissions.contains({permissions: ["downloads"]});
     if(!downLoadsPermitted){
@@ -1026,6 +1112,9 @@ async function exportPreferences() {
     });
 }
 
+/** Takes the data of the supplied file and checks the validity of the data. Then calls the insertDefaultSettings() and putIndiPrefsForProfileInDB() to update the storage.
+ * @param {Event} event - event whose target is the input with the file
+ * @return {void}*/
 function importSettings(event){
     const input_file = event.target;
     const  file = input_file.files[0];
@@ -1097,6 +1186,8 @@ function importSettings(event){
 }
 // ------------------------------- SYNCING WITH GOOGLE DRIVE -----------------------------
 
+/** Gets the export object and uploads it to Google Drive using the putFileToDrive() function. Encrypts the data beforehand if needed.
+ * @returns {void}*/
 function uploadToGDrive(){
     //prepare the content to upload
     //stringify it
@@ -1128,7 +1219,8 @@ function uploadToGDrive(){
         putFileToDrive(exportObject);
     });
 }
-
+/** Downloads data from drive using the getFileFromDrive function. Validates the data and the updates the relevant storage places.
+ * @returns {void}*/
 function downloadFromGDrive(){
     browser.permissions.request({origins: ["*://www.googleapis.com/*"]}).then(function(permission){
 
@@ -1181,6 +1273,9 @@ function downloadFromGDrive(){
 }
 
 //--------------------- MAIN FUNCTION AND EVENT HANDLERS -------------------------
+
+/** Event Handler. Resumes the initialization process by decrypting the storage of the active profile in order to display the individual preferences etc.
+ * @returns {void}*/
 async function encryptionPasswordInputHandler(){
     const input = document.getElementById("profile_encryption_pwd-input");
     const password = input.value;
@@ -1203,6 +1298,10 @@ async function encryptionPasswordInputHandler(){
     }
 }
 
+/** Fills the select element in the HTML document with the options representing all the prrfiles.
+ * @param {Array} profilesArray - an array DefaultPreferences objects
+ * @param {number} activeProfileID - the id of the active profile
+ * @returns {void}*/
 function displayProfileSelect(profilesArray, activeProfileID){
     const select = document.getElementById("profile-select");
     select.innerHTML = "";
@@ -1218,6 +1317,9 @@ function displayProfileSelect(profilesArray, activeProfileID){
     });
 }
 
+/** Event Handler. Changes the active profile to a new one, when the user chooses another profile from the profile select. Afterwards calls initialize()
+ * @param {Event} event - event whose target contains the id of the profile to change the active profile to as its value.
+ * @returns {void}*/
 function changeActiveProfileHandler(event){
     const select = event.target;
     const newActiveProfileID = select.value;
@@ -1236,6 +1338,11 @@ function changeActiveProfileHandler(event){
     });
 }
 
+/** Encrypts or decrypts the profile by changing its encrypt boolean value in the DefaultPreferences and also encrypts or decrypts its database entry. This function
+ * accesses the global variables allProfilesDefaults.activeProfile and encryptionPassword. Afterwards calls initialize()
+ * @param {Event} event - event whose target is the checkbox indicating either to encrypt or decrypt
+ * @returns {void}
+ * */
 async function toggleEncryptProfile(event){
     const checkbox = event.target;
     let id = allProfilesDefaults.activeProfile.id;
@@ -1247,6 +1354,7 @@ async function toggleEncryptProfile(event){
 
         if(password == null || password == ""){
             //TODO display error, must supply a password
+            checkbox.checked = false;
             return;
         }
 
@@ -1291,6 +1399,8 @@ async function toggleEncryptProfile(event){
     //pokial odsifrujeme zoberiem existujuce heslo, ktore pouzivatel uz zadal, vyberieme obsah celej databazy, odsifrujeme a vlozime naspat ako JSON, init(?)
 }
 
+/** Initialize the options page. Get the default preferences of all profiles, display all profiles, display the profile select, and display the table etc.
+ * @returns {void}*/
 async function initialize(){
     //open the preferences - fill the preferences tab
     const allProfilesDefaultPreferences = await getDefaultPreferences();
