@@ -223,13 +223,17 @@ button {
     opacity: 1;
     transition: opacity 0.6s;
 }
-
-.alert-warning {
-    background-color: orange;
-}
-
 .alert-danger {
     background-color: #f44336; /* Red */
+}
+.alert-success {
+    background-color: #04AA6D; /* Green */
+}
+.alert-info {
+    background-color: #0095dd; /* Blue */
+}
+.alert-warning {
+    background-color: orange; /* orange */
 }
 
 /* The close button */

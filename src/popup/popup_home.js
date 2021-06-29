@@ -262,7 +262,6 @@ async function storePrefInDB(){
     preference.constant = DOM_constant.value; //get the constant here
 
     //put the preference for domain in the array
-    //change the preference for all the services with the same name in the array
     const indexOfPref = indiPrefs.findIndex(el => el.domain == preference.domain);
     if(indexOfPref != -1){
         //update the existing preference
@@ -273,6 +272,7 @@ async function storePrefInDB(){
         indiPrefs.push(preference);
     }
 
+    //change the preference for all the services with the same name in the array
     indiPrefs.forEach(el => {
         if(el.service == preference.service){
             el.encoding = preference.encoding;
@@ -305,6 +305,12 @@ async function storePrefInDB(){
         const objStore = transaction.objectStore("preferences");
 
         objStore.put(storeData, preferencesDefault.id);
+
+        transaction.oncomplete = function(){
+            let service = (preference.service.length > 12)? preference.service.substr(0, 12) + '&hellip;' : preference.service;
+            let domain = (preference.domain.length > 12)? preference.domain.substr(0, 12) + '&hellip;' : preference.domain;
+            displayAlert(`Preference for the domain <strong>"${domain}"</strong> under the service <strong>"${service}"</strong> was saved.`, "success", 3);
+        }
     }
     catch (e) {
         console.log(e);
@@ -766,16 +772,16 @@ function displayAlert(alert_text, alert_type, display_time){
     span.addEventListener("click", function(){this.parentElement.style.display='none'});
 
     newAlert.classList.add("alert", css_type);
+    newAlert.innerHTML = alert_text;
     newAlert.appendChild(span);
-    newAlert.appendChild(document.createTextNode(error_text));
 
-    alerts_container.appendChild(myError);
+    alerts_container.appendChild(newAlert);
     if(display_time !== undefined) {
         setTimeout(function () {
-            myError.style.opacity = 0;
+            newAlert.style.opacity = 0;
         }, display_time * 1000);
         setTimeout(function () {
-            errors_container.removeChild(myError)
+            alerts_container.removeChild(newAlert)
         }, display_time * 1000 + 500);
     }
 }
