@@ -56,12 +56,12 @@ let suffListData; //extracted suff list data from storage upon opening of the po
 let indiPrefDB; //DB object of the individual preferences upon opening of the popup
 
 /**
- * An array of all the IndividualPreference objects of the active profile
+ * An array of all the IndividualPreference objects of the active profile. Initialized as an empty array, in case we can't access the database.
  * @type {Array} */
 let indiPrefs = [];
 
-/** Filled with the preferences for *domain* upon initialization (if it can be found),
-*   and modified with the preferences for Service whenever the user changes the service field (if it can be found)
+/** Filled with the IndividualPreference for the *domain* upon initialization (if it can be found in DB),
+*   and updated with the preference for a *service* whenever the user changes the service field (if it can be found)
  *
  * @type {IndividualPreference}
 */
@@ -70,7 +70,8 @@ let preferenceForService = {};
 /** @type {DefaultPreferences} */
 let preferencesDefault = {};
 
-/** Contains boolean information about whether a preference has been saved for either the domain or service individually, or both at the same time.*/
+/** Contains boolean information about whether a preference has been saved for either the domain or service individually, or both at the same time.
+ * @type {object}*/
 let isStored = {
     domain: false,
     service: false
@@ -210,7 +211,7 @@ function getAllIndiPrefsForActiveProfile(db, profilePreference, decrypt_password
 /*return the preference object for domain if found, otherwise undefined*/
 /**
  * get the preference object for the specific domain from the global indiPrefs array
- * @returns {IndividualPreference}
+ * @returns {(IndividualPreference|undefined)} returns the preference object if it was found, otherwise undefined
  * */
 function getPrefForDomain(domain){
     console.log(`Getting preference for domain: ${domain}`);
@@ -220,7 +221,7 @@ function getPrefForDomain(domain){
 /*return the first preference object of a given service if found, otherwise undefined*/
 /**
  * get the first preference object for the specific service from the global indiPrefs array
- * @returns {IndividualPreference}
+ * @returns {(IndividualPreference|undefined)} returns the preference object if it was found, otherwise undefined
  * */
 function getPrefForService(service){
     return indiPrefs.find(el => el.service == service);
@@ -299,10 +300,15 @@ async function storePrefInDB(){
         storeData = await encrypt(encryptionPassword.getPasswordForID(preferencesDefault.id), JSON.stringify(storeData));
     }
 
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
+    try{
+        const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+        const objStore = transaction.objectStore("preferences");
 
-    objStore.put(storeData, preferencesDefault.id);
+        objStore.put(storeData, preferencesDefault.id);
+    }
+    catch (e) {
+        console.log(e);
+    }
 }
 
 /**
@@ -340,6 +346,13 @@ function get_main_domain_or_ip(domain_or_ip){
         }
     }
     const hostName = domain_or_ip_without_port;
+
+    //if the string contains an IP address, return the IP address
+    let matchIPv4 = domain_or_ip_without_port.match(/(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(:\d{1,5})?/g);
+    if(matchIPv4 != null){
+        return matchIPv4[0];
+    }
+
     let result = domain_or_ip_without_port;
 
     try {
@@ -468,10 +481,24 @@ function generatePassword(){
         });
 }
 
-/***/
-function getSubdomainsOptions(domain, service_name){
-    var splittedDomain = domain.split(".");
-    var subdomains = splittedDomain.slice(0, splittedDomain.indexOf(service_name)); // array of subdomains without public suffix
+/** Returns an array of possible service name options derived from the subdomains. For example:
+ * developer.mozilla.org -> ["mozilla", "developer.mozilla"]
+ * a.b.c.d.[publicsuffix] -> ["d", "c.d", "b.c.d", "a.b.c.d"]
+ *
+ * @param {string} domain - the domain that was already extracted beforehand during initialization
+ * @returns {Array} - an array of possible service name options derived from the subdomains*/
+function getSubdomainsOptions(domain){
+    //if there is an ip address in there, just return the IP address
+    let matchIpv4Address = domain.match(/(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(:\d{1,5})?/g);
+    if(matchIpv4Address != null){
+        return matchIpv4Address;
+    }
+
+    publicSuffixList.parse(suffListData, punycode.toASCII);
+    var publicSuffix = publicSuffixList.getPublicSuffix(domain);
+
+    var splittedDomain = domain.split("."); console.log(splittedDomain);
+    var subdomains = splittedDomain.slice(0, splittedDomain.indexOf(publicSuffix)); // array of subdomains without public suffix
 
     var optionstring = new String();
     let result = [];
@@ -480,6 +507,8 @@ function getSubdomainsOptions(domain, service_name){
         result.push(optionstring);
         optionstring = "." + optionstring;
     }
+    // console.log(`The possible subdomains are: `);
+    // console.log(result);
     return result;
 }
 
@@ -489,6 +518,12 @@ function getSubdomainsOptions(domain, service_name){
  * @param {Array} allServicesArray - an array of all the service names for the active profile
  * @returns {void}*/
 function displayUIDetails(allServicesArray){
+    //disable saving in incognito mode
+    if(browser.extension.inIncognitoContext){
+        DOM_store_preference.checked = false;
+        DOM_store_preference.disabled = true;
+    }
+
     //"generate and save" button
     if(DOM_store_preference.checked){
         document.getElementById("home-generate_password-btn").innerText = "Generate & Save";
@@ -529,7 +564,7 @@ function displayUIDetails(allServicesArray){
         datalist.append(option);
     });
 
-    DOM_generated_password.value = "";
+
     document.getElementById("home-update_warning-container").hidden = true;
 
 }
@@ -539,6 +574,9 @@ function displayUIDetails(allServicesArray){
  * @returns {void}*/
 async function initialize(){
     console.log(`Initializing!`);
+
+    DOM_user_password.value = "";
+    DOM_generated_password.value = "";
 
     //catch the errors here too!
     suffListData = await browser.storage.local.get("publicsuffix").then(result => result.publicsuffix.data);
@@ -576,7 +614,7 @@ async function initialize(){
     else {
         document.getElementById("popup-encryption_pwd").hidden = true;
 
-        try {
+        try {//in case indiPrefDB is undefined
             //nacitaj vsetky indiPref aktualneho profilu
             indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, encryptionPassword.getPasswordForID(preferencesDefault.id));
         }catch (error){
@@ -596,8 +634,10 @@ async function encryptionPasswordInputHandler(){
     console.log(`This is the password we got: ${password}`);
 
     try {
-        console.log(`Getting the preferences for ${preferencesDefault.profile} with id ${preferencesDefault.profile}`);
-        indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, password);
+        if(indiPrefDB !== undefined){ //only proceed if database is not undefined, otherwise it'd throw an error
+            console.log(`Getting the preferences for ${preferencesDefault.profile} with id ${preferencesDefault.profile}`);
+            indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, password); //this will throw an error if decryption fails
+        }
 
         encryptionPassword.passwords.push({profile_id: preferencesDefault.id, password: password});
 
@@ -612,7 +652,7 @@ async function encryptionPasswordInputHandler(){
         fillUIWithPreferences();
     } catch(error){
         console.log(error);
-        displayError("Decryption error");
+        displayAlert("Decryption error", "danger", 3);
     }
 }
 
@@ -660,14 +700,16 @@ async function fillUIWithPreferences() {
     DOM_store_preference.checked = prefDefault.save_preferences;
 
     //ADDING THE AUTOFILL
-    // const subdomainslist = getSubdomainsOptions(domain);
-    // console.log(`Subdomains options: `);
-    // console.log(subdomainslist, service_name);
+    const subdomainslist = getSubdomainsOptions(domain);
+    const allServices = getAllServices();
 
-    const allServicesArray = getAllServices();
-    // allServicesArray.unshift.apply(this, subdomainslist);
+    let serviceNameOptionsArray = subdomainslist.concat(allServices);
+    //filter out duplicates
+    serviceNameOptionsArray = serviceNameOptionsArray.filter((el, index, thisArray) => {
+       return thisArray.indexOf(el) === index;
+    });
 
-    displayUIDetails(allServicesArray);
+    displayUIDetails(serviceNameOptionsArray);
 }
 
 /**Sets the inputs in the UI - password encoding and password length
@@ -703,23 +745,39 @@ function fillProfileSelect(preferences, activeProfileId){
 
 //take the error place and append some error elements with children
 /** Takes an error message and displaus the error in the UI
- * @param {string} error_text - error message*/
-function displayError(error_text){
-    const errors_container = document.getElementById("errors-container");
+ * @param {string} alert_text - alert message
+ * @param {string} alert_type - type of alert - danger, success, warning, etc.
+ * @param {number} display_time - the length of time to keep the alert displayed for
+ * @returns {void}*/
+function displayAlert(alert_text, alert_type, display_time){
+    const alerts_container = document.getElementById("alerts-container");
 
-    const myError = document.createElement("div");
+    switch(alert_type){
+        case "danger": css_type = "alert-danger"; break;
+        case "success": css_type = "alert-success"; break;
+        case "info": css_type = "alert-info"; break;
+        case "warning": css_type = "alert-warning"; break;
+    }
+
+    const newAlert = document.createElement("div");
     const span = document.createElement("span");
     span.classList.add("close_alert-btn");
     span.innerHTML = "&times;";
     span.addEventListener("click", function(){this.parentElement.style.display='none'});
 
-    myError.classList.add("alert", "alert-danger");
-    myError.appendChild(span);
-    myError.appendChild(document.createTextNode(error_text));
+    newAlert.classList.add("alert", css_type);
+    newAlert.appendChild(span);
+    newAlert.appendChild(document.createTextNode(error_text));
 
-    errors_container.appendChild(myError);
-    setTimeout(function(){myError.style.opacity = 0;}, 3000);
-    setTimeout(function(){errors_container.removeChild(myError)}, 4000);
+    alerts_container.appendChild(myError);
+    if(display_time !== undefined) {
+        setTimeout(function () {
+            myError.style.opacity = 0;
+        }, display_time * 1000);
+        setTimeout(function () {
+            errors_container.removeChild(myError)
+        }, display_time * 1000 + 500);
+    }
 }
 
 /** displays the warning container warning the user about a potential change in the saved preferences
@@ -755,19 +813,19 @@ function generatePasswordHandler(event){
     let invalidInput = false;
     if(DOM_user_password.value == ""){
         //notify about the error
-        displayError("Pasword field is empty."); invalidInput = true;
+        displayAlert("Pasword field is empty.", "danger", 3); invalidInput = true;
     }
     //validate password length - redundant because we're using the slider anyway
     if(isNaN(DOM_password_length.value)  || DOM_password_length.value < 4 || DOM_password_length.value > 64){
-        displayError("Invalid password length. Password length must be a number in the range of 4 and 64."); invalidInput = true;
+        displayAlert("Invalid password length. Password length must be a number in the range of 4 and 64.", "danger", 3); invalidInput = true;
     }
     //validate that at least one character set was chosen
     if(!DOM_checkbox_lower_case.checked && !DOM_checkbox_upper_case.checked
         && !DOM_checkbox_numbers.checked && !DOM_checkbox_special_chars.checked){
-        displayError("No character set chosen."); invalidInput = true;
+        displayAlert("No character set chosen.", "danger", 3); invalidInput = true;
     }
     if(DOM_domain_main_part.value == ""){
-        displayError("Service field is empty."); invalidInput = true;
+        displayError("Service field is empty.", "danger", 3); invalidInput = true;
     }
 
     if(invalidInput){
@@ -798,7 +856,7 @@ function generatePasswordHandler(event){
     });
 
     //store if desired
-    if(DOM_store_preference.checked){
+    if(DOM_store_preference.checked && event.key !== 'Enter'){
         //store rule in database
         storePrefInDB();
     }

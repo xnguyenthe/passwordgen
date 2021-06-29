@@ -18,10 +18,9 @@ const VALIDATION_BASE_URL="https://www.googleapis.com/oauth2/v3/tokeninfo";
 */
 function extractAccessToken(redirectUri) {
     let m = redirectUri.match(/[#?](.*)/);
-    //d
-    console.log("This is the regex match result for the redirectURI:");
-    console.log(m);
-    //ed
+
+    console.log(redirectUri);
+
     if (!m || m.length < 1)
         return null;
     let params = new URLSearchParams(m[1].split("#")[0]);
@@ -45,7 +44,7 @@ function extractAccessToken(redirectUri) {
  Note that the Google page talks about an "audience" property, but in fact
  it seems to be "aud".
 
- @param {string} the access token
+ @param {string} accessToken - the access token
  @returns {Promise} a Promise which resolves with the valid access token, or rejects if the the token is invalid
  */
 function validate(accessToken) {
@@ -153,15 +152,22 @@ function listFiles(){
 const FILE_NAME = "passwordgen.txt";
 
 /**
- * takes the content and puts it send it to google drive. If there are no files in the drive which belong to this app, it will create a new one. If there already is a file,
+ * Takes the content and sends it to google drive. If there are no files in the drive which belong to this app, it will create a new one. If there already is a file,
  * it will update that file. See more at: https://developers.google.com/drive/api/v3/reference/files/create
+ * Will throw an error if the authorization process fails.
  * @param {object} content - json object, which is then stringified and put to drive
  * @returns {Promise} A promise as a result of using fetch which should resolve with the file id in the drive.
  * */
 async function putFileToDrive(content){
 
+    //if getting the access token fails (for example user aborts authorization), it'll throw an error "Error: User cancelled or denied access."
+    //i.e., this async function puFileToDrive will also abort and throw that error
     const accessToken = await getAccessToken();
     const files_in_drive = await listFiles();
+
+    //this random hex string is used as a boundary in the multipart request body - just so we decrease the chance of the content containing "--boundary" and messing up the request
+    const randomString = Math.random().toString(16).substr(2, 8);
+    const boundary = `boundary${randomString}`;
 
     console.log(`PasswordGen's files in drive are: `);
     console.log(files_in_drive);
@@ -171,16 +177,16 @@ async function putFileToDrive(content){
         const requestURL = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
-        requestHeaders.append('Content-Type', 'multipart/related;boundary=boundary');
+        requestHeaders.append('Content-Type', `multipart/related;boundary=boundary${randomString}`);
 
         const requestBody =
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: application/json;charset=UTF-8\n\n' +
             `{"name": "${FILE_NAME}"}\n` +
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: text/plain\n\n' +
             JSON.stringify(content, null, 4) + '\n' +
-            '--boundary--';
+            `--${boundary}--`;
 
         const driveRequest = new Request(requestURL, {
             method: "POST",
@@ -191,7 +197,9 @@ async function putFileToDrive(content){
         console.log("Creating a new file in Google Drive");
         return fetch(driveRequest).then((response) => {
             if (response.status === 200) {
-                return response.json();
+                let resp = response.json();
+                console.log(resp);
+                return resp;
             } else {
                 throw response.status;
             }
@@ -209,13 +217,13 @@ async function putFileToDrive(content){
         requestHeaders.append('Content-Type', 'multipart/related;boundary=boundary');
 
         const requestBody =
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: application/json;charset=UTF-8\n\n' +
             `{"name": "${FILE_NAME}"}\n` +
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: text/plain\n\n' +
             JSON.stringify(content, null, 4) + '\n' +
-            '--boundary--';
+            `--${boundary}--`;
 
         const driveRequest = new Request(requestURL, {
             method: "PATCH",
@@ -225,7 +233,9 @@ async function putFileToDrive(content){
 
         return fetch(driveRequest).then((response) => {
             if (response.status === 200) {
-                return response.json();
+                let resp = response.json();
+                console.log(resp);
+                return resp;
             } else {
                 throw response.status;
             }
@@ -234,6 +244,7 @@ async function putFileToDrive(content){
 }
 
 /** Gets the contents of the newest file from drive.
+ * Will throw an error if authorization fails.
  * @returns {Promise} promise which resolves with the text content of the file or an empty object*/
 async function getFileFromDrive(){
     const accessToken = await getAccessToken();
@@ -262,6 +273,6 @@ async function getFileFromDrive(){
     }
     else {
         console.log("No file found in Drive, returning empty object...");
-        return {};
+        throw "No back-up file found";
     }
 }

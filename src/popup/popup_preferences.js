@@ -9,6 +9,7 @@ function displayCurrentDefaultPreferences(){
 
         document.getElementById("defaults-profile_name").value = prefs[activeProfileIndex].profile;
         document.getElementById("defaults-constant").value = prefs[activeProfileIndex].constant;
+
         document.getElementById("defaults-lower_case-chckbx").checked = prefs[activeProfileIndex].encoding.lower;
         document.getElementById("defaults-upper_case-chckbx").checked = prefs[activeProfileIndex].encoding.upper;
         document.getElementById("defaults-numbers-chckbx").checked = prefs[activeProfileIndex].encoding.num;
@@ -25,7 +26,40 @@ function displayCurrentDefaultPreferences(){
 function updatePreferencesHandler(event){
     const element = event.target;
 
-    //alternatively, read all of their values at once and update them at once instead of one by one
+    //validate input
+    const PROFILE_NAME_MAX_LEN = 20;
+    const CONSTANT_MAX_LEN = 100;
+
+    let profile_name = document.getElementById("defaults-profile_name").value;
+    let constant = document.getElementById("defaults-constant").value;
+
+    let length = parseInt(document.getElementById("defaults-pwd_length").value);
+    document.getElementById("defaults-pwd_length").value = length; //in case it was a decimal number
+
+    if(profile_name.length > PROFILE_NAME_MAX_LEN){
+        displayError("Profile name character limit: 20");
+        document.getElementById("defaults-profile_name").value = profile_name.substr(0, PROFILE_NAME_MAX_LEN);
+    }
+    if(constant.length > CONSTANT_MAX_LEN){
+        displayError("Constant character limit: 100");
+        document.getElementById("defaults-constant").value = constant.substr(0, CONSTANT_MAX_LEN);
+    }
+    if(isNaN(length) || length < 4 || length > 64){
+        // displayError("Password length must be an integer in the range of 4 and 64.");
+        document.getElementById("defaults-pwd_length").value = 64;
+    }
+    if(!document.getElementById("defaults-lower_case-chckbx").checked &&
+        !document.getElementById("defaults-upper_case-chckbx").checked &&
+        !document.getElementById("defaults-numbers-chckbx").checked &&
+        !document.getElementById("defaults-special_chars-chckbx").checked ){
+        // displayError("At least one character set must be selected.");
+        if(element.type == "checkbox"){
+            element.checked = true;
+        }
+    }
+
+
+    //update the storage with the new values
     browser.storage.local.get(["preferences", "profiles"])
         .then(result => {
             let prefs = result.preferences;
