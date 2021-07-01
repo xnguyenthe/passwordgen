@@ -1039,7 +1039,7 @@ DOM_domain_main_part.addEventListener("keypress", function(event){
 document.querySelectorAll('#home-pwd_options input').forEach(e => {
   e.addEventListener("change", potentialUpdateOfPreferencesHandler);
 });
-DOM_store_preference.addEventListener("click", potentialUpdateOfPreferencesHandler);
+DOM_store_preference.addEventListener("change", potentialUpdateOfPreferencesHandler);
 
 document.getElementById("heading-profile_select").addEventListener("change", profileChangeHandler);
 

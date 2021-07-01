@@ -177,7 +177,7 @@ async function putFileToDrive(content){
         const requestURL = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
-        requestHeaders.append('Content-Type', `multipart/related;boundary=boundary${randomString}`);
+        requestHeaders.append('Content-Type', `multipart/related;boundary=${boundary}`);
 
         const requestBody =
             `--${boundary}\n` +
@@ -214,7 +214,7 @@ async function putFileToDrive(content){
         const requestURL = `https://www.googleapis.com/upload/drive/v3/files/${fileToUpdateID}?uploadType=multipart`;
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
-        requestHeaders.append('Content-Type', 'multipart/related;boundary=boundary');
+        requestHeaders.append('Content-Type', `multipart/related;boundary=${boundary}`);
 
         const requestBody =
             `--${boundary}\n` +
@@ -237,6 +237,7 @@ async function putFileToDrive(content){
                 console.log(resp);
                 return resp;
             } else {
+                console.log(response);
                 throw response.status;
             }
         });

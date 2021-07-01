@@ -26,7 +26,7 @@
 
     <h2>Individual Profiles</h2>
     <select id="profile-select"></select>
-    <div id="profile_decryption_password-container" class="decryption_password-container">
+    <div id="profile_decryption_password-container" class="password-prompt">
         <div id="decrypt_profile-alert-container"></div>
         <p>Please Enter your decryption password first!</p>
         <input id="profile_decryption_pwd-input" type="password" />
@@ -37,10 +37,10 @@
         <div>
             <input id="encrypt-profile-checkbox" type="checkbox"/>
             <label for="encrypt-profile-checkbox">Encrypt profile</label>
-            <div id="profile_encryption_pwd-container">
+            <div id="profile_encryption_pwd-container" class="password-prompt">
                 <p>Please enter an encryption password:</p>
                 <input id="profile_encryption_pwd-input" type="password" />
-                <input id="profile_encryption_pwd-submit" type="submit" />
+                <input id="profile_encryption_pwd-submit" type="submit" value="Enter" />
             </div>
             <div id="encrypt_profile-alert-container"></div>
             <p>
@@ -53,9 +53,10 @@
             <div class="export-section-container">
                 <label for="encrypt_export-checkbox">Encrypt file before exporting</label>
                 <input id="encrypt_export-checkbox" type="checkbox"/>
-                <div id="export_file_encryption_pwd-container">
-                    <p>Please enter an encryption password:</p>
-                    <input id="export_file_encryption_pwd-input" type="password" />
+
+                <div id="export_file_encryption_pwd-row">
+                    <label for="export_file_encryption_pwd-input">Encryption password: </label>
+                    <input id="export_file_encryption_pwd-input" type="password"/>
                 </div>
 
                 <span>Export to file</span>
@@ -71,11 +72,11 @@
                 <input id="import-btn" type="file" name="Import"/>
                 <span>Download back-up from Google Drive</span>
                 <span id="download-from-gdrive-btn" class="material-icons pointer">cloud_download</span>
-                <div id="import_file_encryption_pwd-container">
-                    <p>Please enter an encryption password:</p>
-                    <input id="import_file_decryption_pwd-input" type="password" />
-                    <input id="import_file_decryption_pwd-submit" type="submit" />
-                </div>
+            </div>
+            <div id="import_file_decryption_pwd-container" class="password-prompt">
+                <p>Please enter a decryption password:</p>
+                <input id="import_file_decryption_pwd-input" type="password" />
+                <input id="import_file_decryption_pwd-submit" type="submit" value="Enter" />
             </div>
             <div id="import-alert-container"></div>
 

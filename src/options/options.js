@@ -438,7 +438,7 @@ function validateImportedJSON(object){
 
     //delete any individual preference that is not valid... or fix it... and display an error message about it
     const indiPrefs = object.individual_preferences;
-    let numOfRejectedPrefs = 0;
+    let rejectedPrefsArray = []; //contains domains of rejected preferences
     for(let i = 0; i < indiPrefs.length; i++){
         let pref = indiPrefs[i];
         let reject = false;
@@ -451,35 +451,41 @@ function validateImportedJSON(object){
             !pref.hasOwnProperty("constant") ||
             !pref.hasOwnProperty("encoding") ||
             !pref.hasOwnProperty("length")){
+            console.log(`properties are wrong for domain: ${pref.domain}`);
             reject = true;
         }
         else {
             if(typeof pref.service !== 'string' || !isValidServiceName(pref.service)){
+                console.log(`service is wrong: ${pref.service}`);
                 reject = true;
             }
             if(typeof pref.domain !== 'string' || ! isValidDomain(pref.domain)){
+                console.log(`domain is wrong: ${pref.service}`);
                 reject = true;
             }
             if(!isValidEncodingObject(pref.encoding) || !isValidEncoding(pref.encoding)){
+                console.log(`encoding object format or validity is wrong for domain: ${pref.domain}`);
                 reject = true;
             }
             pref.length = Number.parseInt(pref.length);
             if(isNaN(pref.length) || pref.length < 4 || pref.length > 64){
+                console.log(`length is wrong: ${pref.length} for domain ${pref.domain}`);
                 reject = true;
             }
             if(!isValidConstant(pref.constant)){
+                console.log(`constant is wrong: ${pref.service} for domain ${pref.domain}`);
                 reject = true;
             }
         }
 
         if(reject){
-            numOfRejectedPrefs++;
+            (pref.hasOwnProperty("domain"))? rejectedPrefsArray.push(pref.domain) : null;
             indiPrefs.splice(i--, 1);
         }
     }
 
-    if(numOfRejectedPrefs != 0){
-        displayAlert(`Number of preferences removed for incorrect data: ${numOfRejectedPrefs}`, "import", "warning", ALERT_DISPLAY_TIME_SHORT);
+    if(rejectedPrefsArray.length > 0){
+        displayAlert(`Preferences removed for incorrect data: ${rejectedPrefsArray.join(', ')}; total: ${rejectedPrefsArray.length}`, "import", "warning");
     }
 
     return object;
@@ -768,6 +774,12 @@ function changePasswordSettings(event){
     if(!encoding.lower && !encoding.upper && !encoding.num && !encoding.special){
         if(input.type == "checkbox"){
             input.checked = true;
+            switch(input.name){
+                case "lower_case": encoding.lower = true; break;
+                case "upper_case": encoding.upper = true; break;
+                case "numbers": encoding.num = true; break;
+                case "special_chars": encoding.special = true; break;
+            }
         }
     }
 
@@ -803,6 +815,12 @@ function changeServiceName(event){
     const input = event.target;
     const service = input.dataset.service;
     const new_service_name = input.value;
+
+    //validate wervice name
+    if(new_service_name > MAX_SERVICE_NAME_LENGTH){
+        displayAlert(`Maximum service name length is ${MAX_SERVICE_NAME_LENGTH} characaters`);
+        new_service_name = input.value = input.value.substr(0, MAX_SERVICE_NAME_LENGTH);
+    }
 
     //check if the new service name we're changing to already exists
     const newServiceNamePreference = allPreferencesArray.find(pref => {
@@ -1221,7 +1239,7 @@ async function exportPreferences() {
     //then stringify the exportobject and have it encrypted
     const exportEncrypted = document.getElementById("encrypt_export-checkbox").checked;
     if(exportEncrypted){
-        password_for_encryption = prompt("Enter password for encryption");
+        const password_for_encryption = document.getElementById("export_file_encryption_pwd-input").value;
 
         //await encryption here
         if(password_for_encryption != null && password_for_encryption != "") {
@@ -1235,6 +1253,8 @@ async function exportPreferences() {
             displayAlert("You must enter an encryption password.", "export", "danger", ALERT_DISPLAY_TIME_SHORT);
             return;
         }
+
+
     }
     else{
         exportObject.data = exportData;
@@ -1252,7 +1272,6 @@ async function exportPreferences() {
         console.log(`Download of item ${id} started`);
     }).catch(error => {
         console.log(error);
-
     });
 }
 
@@ -1291,40 +1310,60 @@ function importSettings(event){
             if(importedJSON.hasOwnProperty("encrypted") && importedJSON.encrypted == true){
                 console.log(`data is encrypted... ${importedJSON.data}`);
                 //decrypt the data first
-                let password = prompt("Enter a password to decrypt the message");
+                // let password = window.prompt("Enter a password to decrypt the message");
 
-                if(password != null && password != "") {
-                    let decryptedData = await decrypt(password, importedJSON.data);
-                    data = JSON.parse(decryptedData);
+                document.getElementById("import_file_decryption_pwd-container").hidden = false;
+                document.getElementById("import_file_decryption_pwd-input").value = "";
+                document.getElementById("import_file_decryption_pwd-submit").addEventListener("click", importDataAfterDecryptionPwdInput);
+
+                async function importDataAfterDecryptionPwdInput(){
+                    const password = document.getElementById("import_file_decryption_pwd-input").value;
+                    document.getElementById("import_file_decryption_pwd-container").hidden = true;
+                    document.getElementById("import_file_decryption_pwd-submit").removeEventListener("click", importDataAfterDecryptionPwdInput);
+
+                    if(password != null && password != "") {
+                        let decryptedData = await decrypt(password, importedJSON.data);
+                        data = JSON.parse(decryptedData);
+                    }
+                    else{
+                        displayAlert("You must supply a decryption password.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
+                        return;
+                    }
+
+                    data = validateImportedJSON(data);
+                    if(data == null){
+                        displayAlert("Imported data is corrupted.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
+                        return;
+                    }
+
+                    insertDefaultSettings(data.default_preferences);
+                    insertImportedPreferencesIntoTable(data.individual_preferences);
                 }
-                else{
-                    displayAlert("You must supply a decryption password.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
-                    return;
-                }
+
             }
             else {
                 data = importedJSON.data;
+
+                // if(!isValidImportedJSON(data)){
+                //     return;
+                // }
+                data = validateImportedJSON(data);
+                if(data == null){
+                    displayAlert("Imported data is corrupted.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
+                    return;
+                }
+
+                // document.getElementById("database-result").innerHTML = JSON.stringify(data, null, 4);
+
+                //update the default preferences for the active profile
+                insertDefaultSettings(data.default_preferences);
+                //update the IndividualPreferences in the database (for the active profile)
+                // putIndiPrefsForProfileInDB(data.individual_preferences).then(e => {
+                //     initialize();
+                // });
+                //or insert the data into the table, and not into the database directly
+                insertImportedPreferencesIntoTable(data.individual_preferences);
             }
-
-            // if(!isValidImportedJSON(data)){
-            //     return;
-            // }
-            data = validateImportedJSON(data);
-            if(data == null){
-                displayAlert("Imported data is corrupted.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
-                return;
-            }
-
-            // document.getElementById("database-result").innerHTML = JSON.stringify(data, null, 4);
-
-            //update the default preferences for the active profile
-            insertDefaultSettings(data.default_preferences);
-            //update the IndividualPreferences in the database (for the active profile)
-            // putIndiPrefsForProfileInDB(data.individual_preferences).then(e => {
-            //     initialize();
-            // });
-            //or insert the data into the table, and not into the database directly
-            insertImportedPreferencesIntoTable(data.individual_preferences);
         }
         catch (error){
             displayAlert("Error parsing the JSON file.", "import", "danger",  ALERT_DISPLAY_TIME_SHORT);
@@ -1346,7 +1385,7 @@ function uploadToGDrive(){
 
         const exportEncrypted = document.getElementById("encrypt_export-checkbox").checked;
         if(exportEncrypted){
-            password_for_encryption = prompt("Enter password for encryption");
+            const password_for_encryption = document.getElementById("export_file_encryption_pwd-input").value;
 
             //await encryption here
             if(password_for_encryption != null && password_for_encryption != "") {
@@ -1360,6 +1399,7 @@ function uploadToGDrive(){
                 displayAlert("You must supply an encryption password", "export", "danger", ALERT_DISPLAY_TIME_SHORT);
                 return;
             }
+
         }
         else{
             exportObject.data = exportData;
@@ -1382,7 +1422,7 @@ function downloadFromGDrive(){
 
         getFileFromDrive()
             .then(async function(content){
-                console.log(content);
+                // console.log(content);
 
                 try {
                     let importedJSON = JSON.parse(content);
@@ -1391,41 +1431,50 @@ function downloadFromGDrive(){
                     if(importedJSON.hasOwnProperty("encrypted") && importedJSON.encrypted == true){
                         console.log(`data is encrypted... ${importedJSON.data}`);
                         //decrypt the data first
-                        let password = prompt("Enter a password to decrypt the message");
+                        // let password = prompt("Enter a password to decrypt the message");
 
-                        if(password != null && password != "") {
-                            let decryptedData = await decrypt(password, importedJSON.data);
-                            data = JSON.parse(decryptedData);
-                        }
-                        else{
-                            displayAlert("You must supply a decryption password.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
-                            return;
+                        document.getElementById("import_file_decryption_pwd-container").hidden = false;
+                        document.getElementById("import_file_decryption_pwd-input").value = "";
+                        document.getElementById("import_file_decryption_pwd-submit").addEventListener("click", importDataAfterDecryptionPwdInput);
+
+                        async function importDataAfterDecryptionPwdInput(){
+                            const password = document.getElementById("import_file_decryption_pwd-input").value;
+                            document.getElementById("import_file_decryption_pwd-container").hidden = true;
+                            document.getElementById("import_file_decryption_pwd-submit").removeEventListener("click", importDataAfterDecryptionPwdInput);
+
+                            if(password != null && password != "") {
+                                let decryptedData = await decrypt(password, importedJSON.data);
+                                data = JSON.parse(decryptedData);
+                            }
+                            else{
+                                displayAlert("You must supply a decryption password.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
+                                return;
+                            }
+
+                            data = validateImportedJSON(data);
+                            if(data == null){
+                                displayAlert("Invalid data.", "import", "danger",  ALERT_DISPLAY_TIME_SHORT);
+                                return;
+                            }
+
+                            insertDefaultSettings(data.default_preferences);
+                            insertImportedPreferencesIntoTable(data.individual_preferences);
                         }
                     }
                     else {
                         data = importedJSON.data;
+
+                        data = validateImportedJSON(data);
+                        if(data == null){
+                            displayAlert("Invalid data.", "import", "danger",  ALERT_DISPLAY_TIME_SHORT);
+                            return;
+                        }
+
+                        //fill the default preferences
+                        insertDefaultSettings(data.default_preferences);
+                        //insert the data into the table, not into the database directly, and let the user save the changes manually
+                        insertImportedPreferencesIntoTable(data.individual_preferences);
                     }
-
-                    // if(!isValidImportedJSON(data)){
-                    //     displayError("Invalid format of preferences.")
-                    //     return;
-                    // }
-                    data = validateImportedJSON(data);
-                    if(data == null){
-                        displayAlert("Invalid data.", "import", "danger",  ALERT_DISPLAY_TIME_SHORT);
-                        return;
-                    }
-
-                    //fill the default preferences
-                    insertDefaultSettings(data.default_preferences);
-
-                    //pass it to the function that will put the objects directly in the database
-                    // putIndiPrefsForProfileInDB(data.individual_preferences).then(e => {
-                    //     initialize();
-                    // });
-
-                    //or insert the data into the table, not into the database directly, and let the user save the changes manually
-                    insertImportedPreferencesIntoTable(data.individual_preferences);
                 }
                 catch (error){
                     displayAlert(`Error parsing the JSON file. ${error}`, "import", "danger",  ALERT_DISPLAY_TIME_SHORT);
@@ -1444,7 +1493,7 @@ function downloadFromGDrive(){
 
 /** Event Handler. Resumes the initialization process by decrypting the storage of the active profile in order to display the individual preferences etc.
  * @returns {void}*/
-async function encryptionPasswordInputHandler(){
+async function decryptionPasswordInputHandler(){
     const input = document.getElementById("profile_decryption_pwd-input");
     const password = input.value;
 
@@ -1518,33 +1567,45 @@ async function toggleEncryptProfile(event){
     //ak sifrujeme, nastavime v profile encrypt na true, zavolame si obsah celej databazy daneho profilu, zasifrujeme, vlozime naspat, init(?)
     //encrypt the profile
     if(checkbox.checked){
-        let password = prompt("Enter a password for encryption");
+        // let password = prompt("Enter a password for encryption");
 
-        if(password == null || password == ""){
-            displayAlert("No encryption password supplied.", "encrypt-profile", "danger", ALERT_DISPLAY_TIME_SHORT);
-            checkbox.checked = false;
-            return;
+        document.getElementById("profile_encryption_pwd-container").hidden = false;
+        document.getElementById("profile_encryption_pwd-input").value = "";
+        document.getElementById("profile_encryption_pwd-submit").addEventListener("click", encryptProfileAfterPwdInput);
+
+        async function encryptProfileAfterPwdInput(){
+            const password = document.getElementById("profile_encryption_pwd-input").value;
+            document.getElementById("profile_encryption_pwd-container").hidden = true;
+            document.getElementById("profile_encryption_pwd-submit").removeEventListener("click", encryptProfileAfterPwdInput);
+
+            if(password == null || password == ""){
+                displayAlert("No encryption password supplied.", "encrypt-profile", "danger", ALERT_DISPLAY_TIME_SHORT);
+                checkbox.checked = false;
+                return;
+            }
+
+            //musime upravit default preferences;
+            allProfilesDefaults.activeProfile.encrypt = true;
+            browser.storage.local.get("preferences").then(result => {
+                let prefs = result.preferences;
+
+                let index = prefs.findIndex(pref => pref.id == id);
+                prefs[index].encrypt = true;
+                //initialize salts here if necessary
+
+                browser.storage.local.set({preferences: prefs});
+            });
+
+            encryptionPassword.passwords.push({profile_id: id, password: password});
+
+            //vyberieme z databazy
+            let indiprefs = await getAllPrefsForProfileFromDB(indiPrefDB, id, false, "");
+            console.log(indiprefs);
+
+            refillIndiPrefsOfProfileInDB(indiprefs);
+
+            displayAlert("Encrypted!", "encrypt-profile", "success", ALERT_DISPLAY_TIME_SHORT);
         }
-
-        //musime upravit default preferences;
-        allProfilesDefaults.activeProfile.encrypt = true;
-        browser.storage.local.get("preferences").then(result => {
-            let prefs = result.preferences;
-
-            let index = prefs.findIndex(pref => pref.id == id);
-            prefs[index].encrypt = true;
-            //initialize salts here if necessary
-
-            browser.storage.local.set({preferences: prefs});
-        });
-
-        encryptionPassword.passwords.push({profile_id: id, password: password});
-
-        //vyberieme z databazy
-        let indiprefs = await getAllPrefsForProfileFromDB(indiPrefDB, id, false, "");
-        console.log(indiprefs);
-
-        refillIndiPrefsOfProfileInDB(indiprefs);
     }
     //decrypt the profile
     else {
@@ -1562,16 +1623,33 @@ async function toggleEncryptProfile(event){
         await refillIndiPrefsOfProfileInDB(indiprefs);
 
         initialize();
+
+        displayAlert("Decrypted!", "encrypt-profile", "success", ALERT_DISPLAY_TIME_SHORT);
     }
 
     //pokial odsifrujeme zoberiem existujuce heslo, ktore pouzivatel uz zadal, vyberieme obsah celej databazy, odsifrujeme a vlozime naspat ako JSON, init(?)
+}
+
+function toggleEncryptFileBeforeExport(){
+    let encrypt = document.getElementById("encrypt_export-checkbox").checked;
+
+    if(encrypt){
+        document.getElementById("export_file_encryption_pwd-input").value = "";
+        document.getElementById("export_file_encryption_pwd-row").style.display = "grid";
+    }
+    else{
+        document.getElementById("export_file_encryption_pwd-row").style.display = "none";
+    }
 }
 
 /** Initialize the options page. Get the default preferences of all profiles, display all profiles, display the profile select, and display the table etc.
  * @returns {void}*/
 async function initialize(){
     document.getElementById("save_changes-btn").classList.remove("changed");
-    // document.getElementById("profile_encryption_pwd-container").hidden = true;
+    document.getElementById("profile_encryption_pwd-container").hidden = true;
+    // document.getElementById("export_file_encryption_pwd-container").hidden = true;
+    document.getElementById("import_file_decryption_pwd-container").hidden = true;
+    document.getElementById("export_file_encryption_pwd-row").style.display = "none";
 
 
     //open the preferences - fill the preferences tab
@@ -1622,12 +1700,14 @@ document.getElementById("download-from-gdrive-btn").addEventListener("click", do
 document.getElementById("save_changes-btn").addEventListener("click", saveModifiedTable);
 document.getElementById("restore_changes-btn").addEventListener("click", initialize);
 
-document.getElementById("profile_decryption_pwd-submit").addEventListener("click", encryptionPasswordInputHandler);
-document.getElementById("profile_decryption_pwd-input").addEventListener("change", encryptionPasswordInputHandler);
+document.getElementById("profile_decryption_pwd-submit").addEventListener("click", decryptionPasswordInputHandler);
+document.getElementById("profile_decryption_pwd-input").addEventListener("change", decryptionPasswordInputHandler);
 
 document.getElementById("profile-select").addEventListener("change", changeActiveProfileHandler);
 
 document.getElementById("encrypt-profile-checkbox").addEventListener("change", toggleEncryptProfile);
+
+document.getElementById("encrypt_export-checkbox").addEventListener("click", toggleEncryptFileBeforeExport);
 
 
 /*
