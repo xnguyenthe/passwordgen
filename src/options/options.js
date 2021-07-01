@@ -970,10 +970,10 @@ function displayPreferences(prefArray){
     const tableHeadings = [
         `<span id="toggle-all-domains-rows" class="material-icons pointer">expand_less</span>`,
         "Service",
-        "Length",
-        "a-z",
-        "A-Z",
-        "0-9",
+        "n",
+        "abc",
+        "ABC",
+        "012",
         "$#@",
         "Constant",
         `<span id="delete-all-preferences-btn" class="material-icons pointer">delete</span>`,
@@ -1445,7 +1445,7 @@ function downloadFromGDrive(){
 /** Event Handler. Resumes the initialization process by decrypting the storage of the active profile in order to display the individual preferences etc.
  * @returns {void}*/
 async function encryptionPasswordInputHandler(){
-    const input = document.getElementById("profile_encryption_pwd-input");
+    const input = document.getElementById("profile_decryption_pwd-input");
     const password = input.value;
 
     console.log(`This is the password we got: ${password}`);
@@ -1455,7 +1455,7 @@ async function encryptionPasswordInputHandler(){
         allPreferencesArray = await getAllPrefsForProfileFromDB(indiPrefDB, allProfilesDefaults.activeProfile.id, allProfilesDefaults.activeProfile.encrypt, password);
 
         encryptionPassword.passwords.push({profile_id: allProfilesDefaults.activeProfile.id, password: password});
-        document.getElementById("encryption_password-container").hidden = true;
+        document.getElementById("profile_decryption_password-container").hidden = true;
         document.getElementById("individual_preferences_section").hidden = false;
 
         document.getElementById("encrypt-profile-checkbox").checked = true;
@@ -1571,6 +1571,8 @@ async function toggleEncryptProfile(event){
  * @returns {void}*/
 async function initialize(){
     document.getElementById("save_changes-btn").classList.remove("changed");
+    // document.getElementById("profile_encryption_pwd-container").hidden = true;
+
 
     //open the preferences - fill the preferences tab
     const allProfilesDefaultPreferences = await getDefaultPreferences();
@@ -1591,14 +1593,14 @@ async function initialize(){
     //if profile is encrypted, ask for the decryption password, if not, carry on displaying the preference table
     if(allProfilesDefaults.activeProfile.encrypt == true && encryptionPassword.getPasswordForID(allProfilesDefaults.activeProfile.id) === undefined){
         //display the dialog for getting the password
-        document.getElementById("encryption_password-container").hidden = false;
+        document.getElementById("profile_decryption_password-container").hidden = false;
         document.getElementById("individual_preferences_section").hidden = true;
 
-        document.getElementById("profile_encryption_pwd-input").value = "";
-        document.getElementById("profile_encryption_pwd-input").focus();
+        document.getElementById("profile_decryption_pwd-input").value = "";
+        document.getElementById("profile_decryption_pwd-input").focus();
     }
     else {
-        document.getElementById("encryption_password-container").hidden = true;
+        document.getElementById("profile_decryption_password-container").hidden = true;
         document.getElementById("individual_preferences_section").hidden = false;
         document.getElementById("encrypt-profile-checkbox").checked = allProfilesDefaults.activeProfile.encrypt;
         let id = allProfilesDefaults.activeProfile.id;
@@ -1620,8 +1622,8 @@ document.getElementById("download-from-gdrive-btn").addEventListener("click", do
 document.getElementById("save_changes-btn").addEventListener("click", saveModifiedTable);
 document.getElementById("restore_changes-btn").addEventListener("click", initialize);
 
-document.getElementById("profile_encryption_pwd-submit").addEventListener("click", encryptionPasswordInputHandler);
-document.getElementById("profile_encryption_pwd-input").addEventListener("change", encryptionPasswordInputHandler);
+document.getElementById("profile_decryption_pwd-submit").addEventListener("click", encryptionPasswordInputHandler);
+document.getElementById("profile_decryption_pwd-input").addEventListener("change", encryptionPasswordInputHandler);
 
 document.getElementById("profile-select").addEventListener("change", changeActiveProfileHandler);
 
