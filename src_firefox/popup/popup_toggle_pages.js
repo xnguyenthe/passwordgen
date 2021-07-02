@@ -34,4 +34,8 @@ document.getElementById("btn-show-defaults").addEventListener("click", showPopup
 document.getElementById("heading_logo").addEventListener("click", showPopupHome);
 document.getElementById("btn-show-settings").addEventListener("click", function(){
     browser.runtime.openOptionsPage();
+
+    // browser.tabs.create({url: '/options/options.html'}).then(r => {
+    //     console.log(r);
+    // });
 });

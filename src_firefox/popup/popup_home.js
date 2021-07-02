@@ -847,6 +847,7 @@ function generatePasswordHandler(event){
             console.log(`Inserting generated password into content page...`);
             browser.tabs.query({active: true, currentWindow: true})
                 .then(tabs => {
+                    browser.tabs.executeScript(tabs[0].id, {file: "/browser-polyfill.js"});
                     browser.tabs.executeScript(tabs[0].id, {file: "/content_scripts/content_script.js"}).then(array => {
                         browser.tabs.sendMessage(tabs[0].id, {
                             message: "inject",

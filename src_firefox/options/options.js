@@ -869,20 +869,20 @@ function deleteService(event){
     const service = event.target.dataset.service;
 
     //get the indexes of all the services
-    allPreferencesArray.every((pref, index, array) => {
-        let strcmp = pref.service.localeCompare(service);
+    for(let i = 0; i < allPreferencesArray.length; i++){
+        let strcmp = allPreferencesArray[i].service.localeCompare(service);
         if(strcmp <= 0) {
             if (strcmp === 0) {
-                console.log(`Deleting the entry for domain ${pref.domain}`);
+                console.log(`Deleting the entry for the service: ${allPreferencesArray[i].service}, domain: ${allPreferencesArray[i].domain}`);
 
-                array.splice(index, 1);
+                allPreferencesArray.splice(i--, 1);
             }
-            return true;
         }
-        else { //break the loop when we've gone past the specified service - we can do this bcs the array is ordered by service and domain
-            return false;
+        else {
+            //once we go past the service we want to delete, we can stop (bcs the array is sorted)
+            break;
         }
-    });
+    }
 
     displayPreferences(allPreferencesArray);
     activateSaveChangesButton();
@@ -1322,8 +1322,14 @@ function importSettings(event){
                     document.getElementById("import_file_decryption_pwd-submit").removeEventListener("click", importDataAfterDecryptionPwdInput);
 
                     if(password != null && password != "") {
-                        let decryptedData = await decrypt(password, importedJSON.data);
-                        data = JSON.parse(decryptedData);
+                        try {
+                            let decryptedData = await decrypt(password, importedJSON.data);
+                            data = JSON.parse(decryptedData);
+                        }
+                        catch (e) {
+                            displayAlert("Decryption error!", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
+                            return;
+                        }
                     }
                     else{
                         displayAlert("You must supply a decryption password.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
@@ -1439,12 +1445,19 @@ function downloadFromGDrive(){
 
                         async function importDataAfterDecryptionPwdInput(){
                             const password = document.getElementById("import_file_decryption_pwd-input").value;
-                            document.getElementById("import_file_decryption_pwd-container").hidden = true;
-                            document.getElementById("import_file_decryption_pwd-submit").removeEventListener("click", importDataAfterDecryptionPwdInput);
 
                             if(password != null && password != "") {
-                                let decryptedData = await decrypt(password, importedJSON.data);
-                                data = JSON.parse(decryptedData);
+                                try {
+                                    let decryptedData = await decrypt(password, importedJSON.data);
+                                    data = JSON.parse(decryptedData);
+
+                                    //hide the password prompt now
+                                    document.getElementById("import_file_decryption_pwd-container").hidden = true;
+                                    document.getElementById("import_file_decryption_pwd-submit").removeEventListener("click", importDataAfterDecryptionPwdInput);
+                                } catch (e) {
+                                    displayAlert("Decryption error!", "import", "danger",  ALERT_DISPLAY_TIME_SHORT);
+                                    return;
+                                }
                             }
                             else{
                                 displayAlert("You must supply a decryption password.", "import", "danger", ALERT_DISPLAY_TIME_SHORT);
