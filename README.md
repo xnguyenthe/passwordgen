@@ -32,6 +32,7 @@ Here you can create or delete profiles, encrypt or decrypt the profiles and mana
 Conversely, it is possible to import settings from a file or download a back-up from Google Drive.
 
 The rest should be self/explanatory.
+<<<<<<< HEAD
 
 ## User guide
 
@@ -73,3 +74,5 @@ It is recommended that you use the same password as your master password, for th
 
 + chrome does not allow downloads to be an optional permission, so in the chrome version it is moved to permissions in the manifest.json file
 + more to come
+=======
+>>>>>>> master
