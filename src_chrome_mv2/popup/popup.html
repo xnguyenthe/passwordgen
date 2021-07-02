@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="popup.css"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet">
+    <script defer src="publicsuffixlist.js"></script>
+    <script defer src="punycode.js"></script>
+    <script defer src="qrcode.js"></script>
+
+    <script defer src="../encrypt/pbkdf2.js"></script>
+
+    <script defer src="../browser-polyfill.js"></script>
+    <script defer src="popup_home.js"></script>
+    <script defer src="popup_preferences.js"></script>
+    <script defer src="popup_toggle_pages.js"></script>
+</head>
+<body>
+    <header>
+        <span id="heading_logo">PwdGen</span>
+        <select id="heading-profile_select">
+            <option value="0">User 1</option>
+            <option value="1">User 2</option>
+            <option value="2">User 3</option>
+            <option value="3">User 4</option>
+        </select>
+
+    </header>
+
+    <main>
+        <div id="alerts-container"> </div>
+        <div id="popup-encryption_pwd">
+            Enter password for decryption:
+            <input id="encryption_pwd-input" type="password"/>
+            <input id="encryption_pwd-submit"  type="submit" value="Enter"/>
+        </div>
+        <div id="popup-home">
+            <div class="container flex-column">
+                <div class="label-tag-row">
+                    <span id="home-domain-span">www.example.com</span>
+                    <span id="stored_domain-tag" style="display:none" class="material-icons md-18">turned_in</span>
+                </div>
+                
+                <div class="label-tag-row">
+                    <label for="home-service_name-input" id="home-service_name-label">Service: </label>
+                    <span id="stored_service-tag" style="display: none" class="material-icons md-18">turned_in</span>
+                </div>
+                <input id="home-service_name-input" value="example" list="home-service_name-datalist"/>
+                <datalist id="home-service_name-datalist">
+                </datalist>
+
+                <label for="home-user_password-input" id="home-user_password-label">Password: </label>
+                <input id="home-user_password-input" type="password" autofocus/>
+                <!--   password generation options     -->
+                <div>
+                    <span id="home-pwd_container-heading">Password options</span>
+                    <span id="btn-show-defaults"  class="material-icons pointer dim-on-hover">tune</span>
+                </div>
+                <section id="home-pwd_options" class="pwd_options_container">
+                    <input id="home-constant-input-hidden" type="text" hidden/>
+                    <div class="encoding_options_container">
+                        <div>
+                            <input id="home-lower_case-chckbx" type="checkbox" checked/>
+                            <label for="home-lower_case-chckbx">a-z</label>
+                        </div>
+                        <div>
+                            <input id="home-upper_case-chckbx" type="checkbox" checked/>
+                            <label for="home-upper_case-chckbx">A-Z</label>
+                        </div>
+                        <div>
+                            <input id="home-numbers-chckbx" type="checkbox" checked/>
+                            <label for="home-numbers-chckbx">0-9</label>
+                        </div>
+                        <div>
+                            <input id="home-special_chars-chckbx" type="checkbox" checked/>
+                            <label for="home-special_chars-chckbx">#$%@</label>
+                        </div>
+                    </div>
+                    <div class="pwd_len_container">
+                        <label for="home-pwd_length">length: <span id="home-pwd_length_value-span"></span></label>
+                        <input id="home-pwd_length" class="slider" type="range" min="4" max="64" value="10">
+                    </div>
+                </section>
+                <!--    end password generation options    -->
+                <div id="home-update_warning-container" class="warning_note" hidden>
+                    <p><strong id="home-update_warning-label">Warning! </strong>You're about to change the saved preference for this service.</p>
+                </div>
+                <section id="save_and_generate_row">
+                    <label for="home-save_this_preference" class="icon_container">
+                        <input id="home-save_this_preference" type="checkbox" hidden/>
+                        <span id="toggle-save-preference-btn" class="material-icons pointer dim-on-hover">bookmark_border</span>
+                    </label>
+                    <button id="home-generate_password-btn">Generate</button>
+                </section>
+                <section id="show_password_qr_row">
+                    <span id="toggle-show-pwd-btn" class="material-icons pointer dim-on-hover">visibility_off</span>
+                    <input id="home-generated_password" type="password"/>
+                    <span id="home-qr_code-btn" class="material-icons pointer dim-on-hover">qr_code</span>
+                    <span id="copy-generated-pwd-btn" class="material-icons pointer dim-on-hover">content_copy</span>
+                </section>
+            </div>
+        </div>
+
+        <div id="popup-defaults" hidden>
+            <div class="container flex-column">
+<!--                <section>-->
+                    <label for="defaults-profile_name">Profile name: </label>
+                    <input id="defaults-profile_name" class="defaults-input" type="text" value="profile1"/>
+<!--                </section>-->
+                <h4>Default preferences</h4>
+<!--                <section>-->
+                    <label for="defaults-constant">Constant:</label>
+                    <input id="defaults-constant" class="defaults-input" type="text"/>
+<!--                </section>-->
+                <section id="defaults-pwd-options" class="pwd_options_container">
+                    <div class="encoding_options_container">
+                        <div>
+                            <input id="defaults-lower_case-chckbx" name="lower-case" class="defaults-input" type="checkbox" checked/>
+                            <label for="defaults-lower_case-chckbx">a-z</label>
+                        </div>
+                        <div>
+                            <input id="defaults-upper_case-chckbx" name="upper-case" class="defaults-input" type="checkbox" checked/>
+                            <label for="defaults-upper_case-chckbx">A-Z</label>
+                        </div>
+                        <div>
+                            <input id="defaults-numbers-chckbx" name="numbers" class="defaults-input" type="checkbox" checked/>
+                            <label for="defaults-numbers-chckbx">0-9</label>
+                        </div>
+                        <div>
+                            <input id="defaults-special_chars-chckbx" name="special-chars" class="defaults-input" type="checkbox" checked/>
+                            <label for="defaults-special_chars-chckbx">#$%@</label>
+                        </div>
+                    </div>
+                    <div class="pwd_len_container">
+                        <label for="defaults-pwd_length">password length</label>
+                        <input id="defaults-pwd_length" name="pwd-length" class="defaults-input" type="number" min="4" max="64" value="10">
+                    </div>
+                    <p>
+                        This default preference is loaded when no prior preference for the visited domain has been saved.
+                    </p>
+                </section>
+                <h4>After the password is generated:</h4>
+                <section class="default-store-inject-copy-options">
+                    <input id="defaults-store_preferences-chckbx" name="store-preferences" class="defaults-input" type="checkbox" checked/>
+                    <label for="defaults-store_preferences-chckbx">Store Individual Preferences</label>
+
+                    <input id="defaults-insert_pwd_into_content-chckbx" name="inject-pwd" class="defaults-input" type="checkbox" checked/>
+                    <label for="defaults-insert_pwd_into_content-chckbx">Automatically insert the generated password in the active tab's password field</label>
+
+                    <input id="defaults-copy_pwd_to_clipboard-chckbx" name="copy-to-clipboard" class="defaults-input" type="checkbox" checked/>
+                    <label for="defaults-copy_pwd_to_clipboard-chckbx">Automatically copy the generated password</label>
+                </section>
+            </div>
+        </div>
+
+        <div id="popup-about" hidden>
+            <div class="container">
+                <article>
+                    <section>
+                        <h4>A Deterministic Password Generator</h4>
+                        <p>PasswordGen will, for the same input (domain name, your password, and your preferences), always generate
+                            the same password everytime. The advantage is, of course, that PasswordGen, unlike traditional password managers, <em>never stores</em> your password.
+                        </p>
+                    </section>
+                    <section>
+                        <h4>Detection of public suffixes</h4>
+                        <p>Often, web services might have different public suffixes or subdomains. For example, "ebay.co.uk" and "ebay.com" (different public suffixes, same service),
+                            and "mail.google.com" and "maps.google.com" (different subdomains, same service) should generate the same password. PasswordGen can detect these public suffixes and subdomains
+                            with the help of <a href="https://publicsuffix.org">publicsuffix.org</a></p>
+                    </section>
+                    <section>
+                        <h4>Use of browser permissions</h4>
+                        <ul>
+                            <li><em>publicsuffix.org</em> is required for detecting public suffixes. No data is sent to publicsuffix.org. PasswordGen only downloads a new list of public suffixes regularly.</li>
+                            <li><em>Download files</em> (optional) is required for you to export a copy of your preferences</li>
+                        </ul>
+                    </section>
+                </article>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <span id="btn-show-about" class="material-icons pointer dim-on-hover">info</span>
+        <span id="btn-show-settings" class="material-icons pointer dim-on-hover">settings</span>
+    </footer>
+
+    <div id="qrcode-underlay" class="qrcode-underlay" hidden>
+        <div id="qrcode"></div>
+    </div>
+</body>
+</html>

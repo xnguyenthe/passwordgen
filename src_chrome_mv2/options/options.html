@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script defer src="../browser-polyfill.js"></script>
+    <script defer src="oauth_authorize.js"></script>
+    <script defer src="../encrypt/pbkdf2.js"></script>
+    <script defer src="options.js"></script>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet"/>
+    <link rel="stylesheet" href="options.css"/>
+
+</head>
+<body>
+<!--    <h1>Options page</h1>-->
+<div id="alert-container"></div>
+
+<section>
+    <h2>All profiles</h2>
+    <div id="all-profiles" class="all_profiles-container"></div>
+    <div id="all_profiles-alert-container"></div>
+</section>
+
+<hr>
+
+<h2>Individual Profiles</h2>
+<select id="profile-select"></select>
+<div id="profile_decryption_password-container" class="password-prompt">
+    <div id="decrypt_profile-alert-container"></div>
+    <p>Please Enter your decryption password first!</p>
+    <input id="profile_decryption_pwd-input" type="password" />
+    <input id="profile_decryption_pwd-submit" type="submit" value="Enter"/>
+</div>
+
+<div id="individual_preferences_section">
+    <div>
+        <input id="encrypt-profile-checkbox" type="checkbox"/>
+        <label for="encrypt-profile-checkbox">Encrypt profile</label>
+        <div id="profile_encryption_pwd-container" class="password-prompt">
+            <p>Please enter an encryption password:</p>
+            <input id="profile_encryption_pwd-input" type="password" />
+            <input id="profile_encryption_pwd-submit" type="submit" value="Enter" />
+        </div>
+        <div id="encrypt_profile-alert-container"></div>
+        <p>
+            It is advised to use the same password for both profile encryption and as a master password in the popup window. The same password entered for profile decryption will, for convenience, also
+            be copied into the "master password" field in the popup window.
+        </p>
+    </div>
+    <div>
+        <h4>Export:</h4>
+        <div class="export-section-container">
+            <label for="encrypt_export-checkbox">Encrypt file before exporting</label>
+            <input id="encrypt_export-checkbox" type="checkbox"/>
+
+            <div id="export_file_encryption_pwd-row">
+                <label for="export_file_encryption_pwd-input">Encryption password: </label>
+                <input id="export_file_encryption_pwd-input" type="password"/>
+            </div>
+
+            <span>Export to file</span>
+            <span id="export-btn" class="material-icons pointer">file_download</span>
+            <span>Back-up to Google Drive</span>
+            <span id="upload-to-gdrive-btn" class="material-icons pointer">cloud_upload</span>
+        </div>
+        <div id="export-alert-container"></div>
+
+        <h4>Import:</h4>
+        <div class="import-section-container">
+            <span>Import from file</span>
+            <input id="import-btn" type="file" name="Import"/>
+            <span>Download back-up from Google Drive</span>
+            <span id="download-from-gdrive-btn" class="material-icons pointer">cloud_download</span>
+        </div>
+        <div id="import_file_decryption_pwd-container" class="password-prompt">
+            <p>Please enter a decryption password:</p>
+            <input id="import_file_decryption_pwd-input" type="password" />
+            <input id="import_file_decryption_pwd-submit" type="submit" value="Enter" />
+        </div>
+        <div id="import-alert-container"></div>
+
+        <section>
+            <h3>Stored preferences for domains</h3>
+            <!--                <button id="delete-all-btn">Delete All Stored Preferences</button>-->
+            <button id="save_changes-btn">Save changes</button>
+            <a href="#" id="restore_changes-btn">Restore</a>
+            <section id="table-container">
+                <table id="table"></table>
+            </section>
+            <pre id="database-result"></pre>
+        </section>
+    </div>
+</div>
+</body>
+</html>
