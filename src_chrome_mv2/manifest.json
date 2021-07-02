@@ -4,15 +4,10 @@
   "description": "A deterninistic password generator. Use the same password to generate secure passwords that are different for each web domain.",
   "version": "1.0",
   "author": "xnguyenthe",
-  "homepage_url": "https://github.com/DanKub/PasswordGen",
+  "homepage_url": "https://github.com/xnguyenthe/passwordgen",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApTjSiCHNTo5kwTj0e2qY4xuUEtu05TDQ99P7wUDgHTPvNMAw+a4xxEEEbV+7PnpCMTFPza55is6CiRYlssvuayI0Ceer53nBkM9pFvHVh3WfkYk1oeCdLqCOLrzzQjQkSiQYKijKBJMD0Mb4jchIawR+21ybmHb+oaOn9UpsIAHO8vepOniJCAL+lr/9ZlT8DymHCSOLzoh3aSzFjbOU0+w/OVDsWJauvtTH8ds49wDk6pFm6ZYVvBDoK87Bi9iDHsVX6EmSQhk91DP5pKmnX/rT8ELhOxM2fHiEUvs9Wq1lQnrbY16BuX9fjBR1uqflpFFGrF8OXqO090K3CxhMewIDAQAB",
   "icons": {
     "64": "icons/passwordgen-64.png"
-  },
-
-  "applications": {
-    "gecko": {
-      "id": "passwordgennew@passwordgen.local"
-    }
   },
 
   "browser_action": {
@@ -26,6 +21,7 @@
   },
   "background": {
     "scripts": [
+      "browser-polyfill.js",
       "background/background.js"
     ]
   },
@@ -33,10 +29,10 @@
     "storage",
     "activeTab",
     "identity",
-    "https://publicsuffix.org/list/public_suffix_list.dat"
+    "https://publicsuffix.org/list/public_suffix_list.dat",
+    "downloads"
   ],
   "optional_permissions": [
-    "*://www.googleapis.com/*",
-    "downloads"
+    "*://www.googleapis.com/*"
   ]
 }

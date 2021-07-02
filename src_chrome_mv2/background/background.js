@@ -1,9 +1,11 @@
+/** Log error*/
 function logError(error){
     console.log(error);
 }
 
-/* Initialize Individual Rules Database "IndiPref", create relevant ObjectStore
-*  returns a promise which resolves with the IDBDatabase object on success and an error on error
+/** Initialize Individual Rules Database "IndiPref", create relevant ObjectStore
+*
+*  @returns {Promise} - A promise which resolves with the IDBDatabase object on success and an error on error
 */
 function initIndiPrefDB() {
     return new Promise((resolve, reject) => {
@@ -18,6 +20,7 @@ function initIndiPrefDB() {
             var objStore = db.createObjectStore("preferences");
 
             /*objects stored in this IDBObjectStore will have the following format:
+            * key1: [
             * { service: "mozilla",
             *   domain: "mozilla.org",
             *   encoding: {
@@ -28,7 +31,12 @@ function initIndiPrefDB() {
             *   },
             *   length: 64,
             *   constant: "my Constant"
-            *  }
+            *  },
+            * ...
+            * ],
+            * key2: "",
+            * key3: [],
+            * ...
             * */
 
             //objStore.createIndex("service", "service");
@@ -41,10 +49,10 @@ function initIndiPrefDB() {
     });
 }
 
-/*  Checks browse.storage.local for the public suffix data to see if the data is there or if it's up-to-date
+/**  Checks browse.storage.local for the public suffix data to see if the data is there or if it's up-to-date
 *   New data is fetched and stored in broswer.storage.local if the data does NOT exist yet, or if it's > 1 month old
 *
-*   returns nothing
+*   @returns {void}
 * */
 function initPublicSuffDataStorage(){
 
@@ -86,8 +94,9 @@ function initPublicSuffDataStorage(){
         .catch(logError);
 }
 
-/*
-*   Initialize Default Preferences object in the browser.storage
+/**
+*   Initialize the array of DefaultPreferences, set the first preference as the activeProfile. Browser.storage.local.
+ *   @returns {void}
 */
 function initDefaultPreferences() {
     const preference = {
@@ -129,9 +138,7 @@ function initDefaultPreferences() {
     }).catch(logError);
 }
 
-/*
-    Initialize the public suffix DB or update it
-*/
+/**Initialize the extension's storage areas - indexedDB for the individual preferences ands browser.storage.local */
 function initExtension() {
     initPublicSuffDataStorage();
     initDefaultPreferences();
@@ -142,3 +149,4 @@ function initExtension() {
 
 
 browser.runtime.onInstalled.addListener(initExtension);
+// console.log(browser.identity.getRedirectURL());

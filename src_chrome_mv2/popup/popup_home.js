@@ -1,13 +1,102 @@
+/**
+ * @typedef PasswordEncoding
+ * @type {object}
+ * @property {boolean} lower - lower case letters
+ * @property {boolean} upper - upper case letters
+ * @property {boolean} num - number characters
+ * @property {boolean} special - special characters
+ * */
+
+/**
+ * @typedef AllDefaultPreferences
+ * @type {object}
+ * @property {object} activeProfile - the preference object of the active profile
+ * @property {array} allPreferencesArray - an array of all the profiles' preference objects, including the active profile
+ * */
+
+/**
+ * @typedef DefaultPreferences
+ * @type {object}
+ * @property {string} profile - name of the profile, whose preference this is
+ * @property {number} id - id of the profile; initialized at object creation as unix time
+ * @property {number} length - preferred length for the generated password
+ * @property {string} constant - salt for the creation of the generated password
+ * @property {PasswordEncoding} encoding - encoding options in key value pairs
+ * @property {boolean} save_preference - automatically save preferences for a given domain
+ * @property {boolean} inject_into_content - automatically inject generated password into content page
+ * @property {boolean} copy_to_clipboard - automatically copy generated passwprd to clipboard
+ * @property {boolean} encrypt - encrypt profile
+ * */
+
+/**
+ * @typedef IndividualPreference
+ * @type {object}
+ * @property {string} service - the name of the service
+ * @property {string} domain - domain
+ * @property {PasswordEncoding} encoding - password encoding
+ * @property {number} length - length
+ * @property {string} constant - constant
+ * */
 // -------------------- GLOBAL CONSTANTS ---------------------------------
 
 //DO NOT CHANGE THE CHARACTER SET or hash number because the algorithm will start generating different passwords
+/** the character set constant
+ * @const {object}*/
 const CHARACTER_SETS = {
     lower_case: "abcdefghijklmnopqrstuvwxyz",
     upper_case: "QWERTYUIOPASDFGHJKLZXCVBNM",
     numbers: "1234567890",
     special_chars: '~!@#$%^&*()_+{}:"|<>?[];\'\\,./'
 };
+/** the number of times to run the hashing function when generating the password
+ * @const {number}*/
 const HASH_N_TIMES = 1000;
+
+let suffListData; //extracted suff list data from storage upon opening of the popup
+let indiPrefDB; //DB object of the individual preferences upon opening of the popup
+
+/**
+ * An array of all the IndividualPreference objects of the active profile. Initialized as an empty array, in case we can't access the database.
+ * @type {Array} */
+let indiPrefs = [];
+
+/** Filled with the IndividualPreference for the *domain* upon initialization (if it can be found in DB),
+*   and updated with the preference for a *service* whenever the user changes the service field (if it can be found)
+ *
+ * @type {IndividualPreference}
+*/
+let preferenceForService = {};
+
+/** @type {DefaultPreferences} */
+let preferencesDefault = {};
+
+/** Contains boolean information about whether a preference has been saved for either the domain or service individually, or both at the same time.
+ * @type {object}*/
+let isStored = {
+    domain: false,
+    service: false
+};
+// 4 different states - 2 obvious ones - when domain is saved, so is service, when domain is NOT saved, service is also (probably, but maybe not) not saved
+// the next 2 states are cause by user input - either from a previous session (if he'd saved messenger.com as "facebook", but hadn't saved facebook.com as "facebook" yet),
+// or in the present session
+//domain    O  X  X  O (X means NOT stored, O means stored)
+//service   O  X  O  X
+//                ^  ^ caused by user input, when he changes the service field - he can either change it to smth that already exists, or not
+
+/** object containing the encryption password for profiles that the user enters while the popup is open, and a method for getting the password of a specific profile
+ * @typedef EncryptionPasswords
+ * @type {object}
+ * @property {Array} passwords - array of objects containing the profile_id and password
+ * @property {function} getPasswordForID - a method for getting the password for the given ID
+ * */
+const encryptionPassword = {
+    passwords: [], //contains {profile_id: id, password: password}
+    getPasswordForID: function(id){
+        let index = this.passwords.findIndex(el => el.profile_id == id);
+        (index != -1) ? console.log(`${index}: ${this.passwords[index].password}`): null;
+        return (index == -1)? undefined : this.passwords[index].password;
+    }
+}; //initialized when the password profile that is selected is encrypted, and the user enters a password
 
 const DOM_domain_name = document.getElementById("home-domain-span");
 const DOM_domain_main_part = document.getElementById("home-service_name-input");
@@ -24,39 +113,13 @@ const DOM_store_preference = document.getElementById("home-save_this_preference"
 
 const DOM_error = document.getElementById("error-content");
 
-let suffListData; //extracted suff list data from storage upon opening of the popup
-let indiPrefDB; //DB object of the individual preferences upon opening of the popup
-
-let indiPrefs = [];
-
-/* Filled with the preferences for *domain* upon initialization (if it can be found),
-*   and modified with the preferences for Service whenever the user changes the service field (if it can be found)
-* data is taken from the indiPrefDB
-*/
-let preferenceForService = {};
-let preferencesDefault = {};
-let isStored = {
-    domain: false,
-    service: false
-};
-// 4 different states - 2 obvious ones - when domain is saved, so is service, when domain is NOT saved, service is also (probably, but maybe not) not saved
-// the next 2 states are cause by user input - either from a previous session (if he'd saved messenger.com as "facebook", but hadn't saved facebook.com as "facebook" yet),
-// or in the present session
-//domain    O  X  X  O (X means NOT stored, O means stored)
-//service   O  X  O  X
-//                ^  ^ caused by user input, when he changes the service field - he can either change it to smth that already exists, or not
-
-const encryptionPassword = {
-    passwords: [], //contains {profile_id: id, password: password}
-    getPasswordForID: function(id){
-        let index = this.passwords.findIndex(el => el.profile_id == id);
-        (index != -1) ? console.log(`${index}: ${this.passwords[index].password}`): null;
-        return (index == -1)? undefined : this.passwords[index].password;
-    }
-}; //initialized when the password profile that is selected is encrypted, and the user enters a password
-
 // -------------------------- HELPER FUNCTION DEFINITIONS --------------------------
 
+
+/**
+* Opens database
+ * @returns {Promise} Promise object representing the IDBDatabase object.
+* */
 function openIndiPrefDB(){
     return new Promise((resolve, reject) => {
         const dbOpenRequest = window.indexedDB.open("IndiPref");
@@ -73,6 +136,11 @@ function openIndiPrefDB(){
 }
 
 /*return a promise that resolves with an object that contains the preferences for the active profile, and an array containing the preferences of all profiles*/
+/**
+ * Gets all the default preferences from browser.storage,local
+ *
+ * @returns {AllDefaultPreferences}
+ * */
 function getDefaultPreferences(){
     console.log(`Getting default preferences of all profiles...`);
     return browser.storage.local.get(["profiles", "preferences"])
@@ -93,6 +161,14 @@ function getDefaultPreferences(){
 /*  return (a promise that resolves with) the entire array of individual preferences for the given profile
 *   if the profile does not exist in the database, return an empty array
 * */
+
+/**
+ * Get all individual preferences for given profile.
+ * @param {IDBDatabase} the opened database object
+ * @param {DefaultPreferences} profilePreference - the profile, for which we want to get individual preferences
+ * @param {string} decrypt_password - password for decryption in case the profile is encrypted
+ * @returns {Array} An array of all the individual preference objects.
+ * */
 function getAllIndiPrefsForActiveProfile(db, profilePreference, decrypt_password){
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(["preferences"], "readonly");
@@ -133,15 +209,28 @@ function getAllIndiPrefsForActiveProfile(db, profilePreference, decrypt_password
 }
 
 /*return the preference object for domain if found, otherwise undefined*/
+/**
+ * get the preference object for the specific domain from the global indiPrefs array
+ * @returns {(IndividualPreference|undefined)} returns the preference object if it was found, otherwise undefined
+ * */
 function getPrefForDomain(domain){
+    console.log(`Getting preference for domain: ${domain}`);
     return indiPrefs.find(el => el.domain == domain);
 }
 
 /*return the first preference object of a given service if found, otherwise undefined*/
+/**
+ * get the first preference object for the specific service from the global indiPrefs array
+ * @returns {(IndividualPreference|undefined)} returns the preference object if it was found, otherwise undefined
+ * */
 function getPrefForService(service){
     return indiPrefs.find(el => el.service == service);
 }
 /*return an array of all the services that have been saved in the database*/
+/**
+ * get the names of all the services from the global indiPrefs array
+ * @returns {Array} an array of all service names
+ * */
 function getAllServices(){
     let services = [];
     indiPrefs.forEach(el => {
@@ -153,6 +242,11 @@ function getAllServices(){
     return services;
 }
 
+/**
+ * Takes the current preferences for the domain and service, and saves them for the particular profile in the database as an IndividualPreference
+ *
+ * @returns {void}
+ * */
 async function storePrefInDB(){
     const preference = {};
     //preference.profile =
@@ -168,7 +262,6 @@ async function storePrefInDB(){
     preference.constant = DOM_constant.value; //get the constant here
 
     //put the preference for domain in the array
-    //change the preference for all the services with the same name in the array
     const indexOfPref = indiPrefs.findIndex(el => el.domain == preference.domain);
     if(indexOfPref != -1){
         //update the existing preference
@@ -179,6 +272,7 @@ async function storePrefInDB(){
         indiPrefs.push(preference);
     }
 
+    //change the preference for all the services with the same name in the array
     indiPrefs.forEach(el => {
         if(el.service == preference.service){
             el.encoding = preference.encoding;
@@ -206,15 +300,29 @@ async function storePrefInDB(){
         storeData = await encrypt(encryptionPassword.getPasswordForID(preferencesDefault.id), JSON.stringify(storeData));
     }
 
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
+    try{
+        const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+        const objStore = transaction.objectStore("preferences");
 
-    objStore.put(storeData, preferencesDefault.id);
+        objStore.put(storeData, preferencesDefault.id);
+
+        transaction.oncomplete = function(){
+            let service = (preference.service.length > 12)? preference.service.substr(0, 12) + '&hellip;' : preference.service;
+            let domain = (preference.domain.length > 12)? preference.domain.substr(0, 12) + '&hellip;' : preference.domain;
+            displayAlert(`Preference for the domain <strong>"${domain}"</strong> under the service <strong>"${service}"</strong> was saved.`, "success", 3);
+        }
+    }
+    catch (e) {
+        console.log(e);
+    }
 }
 
-/*
+/**
 * Should return the domain name (url without the protocol, path to file, parameters, or anchors) including port, if there is one
 * for more info see: https://developer.mozilla.org/en-US/docs/Learn/Common_questions/What_is_a_URL#basics_anatomy_of_a_url
+ *
+ * @param {string} url - the full url
+ * @returns {string} the url string without the protocol or the path
 * */
 function get_url_without_protocol_or_path(url){ //e.g.: https://www.mozilla.org/en-US/
     const urlWithoutProtocol = url.replace(/(^\w+:|^)\/\//, ''); //e.g.: www.mozilla.org/en-US/
@@ -223,13 +331,13 @@ function get_url_without_protocol_or_path(url){ //e.g.: https://www.mozilla.org/
     return authority; //e.g. www.google.com or an IP address like 192.168.0.1:8080 - MAY CONTAIN port
 }
 
-/*
+/**
 * Get the main part of the domain - i.e. without the subdomains, and public suffix (suffix includes e.g. the top level domain)
 * e.g. it'll take "www.developer.mozilla.org" and return "mozilla".
 *
 * If it happens to be an IP address, it'll leave it that be.
 *
-* returns the so called "main part" (for the lack of a better term) of the domain, or the ip address if that's
+* @returns {string} For the purposes of this app, the name of the service
 * */
 function get_main_domain_or_ip(domain_or_ip){
     const domain_or_ip_without_port = domain_or_ip.split(":")[0]; // ip without port
@@ -244,6 +352,13 @@ function get_main_domain_or_ip(domain_or_ip){
         }
     }
     const hostName = domain_or_ip_without_port;
+
+    //if the string contains an IP address, return the IP address
+    let matchIPv4 = domain_or_ip_without_port.match(/(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(:\d{1,5})?/g);
+    if(matchIPv4 != null){
+        return matchIPv4[0];
+    }
+
     let result = domain_or_ip_without_port;
 
     try {
@@ -269,12 +384,22 @@ function displayIndiPrefContent(){
     }
 }
 
+/**
+ * Generates the password from the inputs (user password, service name, contant) and preferences (encoding, length)
+ *
+ * @returns {Promise} A promise that represents the generated password
+ * */
 function generatePassword(){
     const service_name = DOM_domain_main_part.value;
     const user_password = DOM_user_password.value;
     const constant = DOM_constant.value;
     const password_length = DOM_password_length.value;
 
+    /**
+     * gets the selection of character sets from the inputs, maps the selection onto the global variable CHARACTER_SETS and returns
+     * an object with the relevant information for the next function to use
+     * @returns {object} result_set - object with an array of all the subsets, and a string of all the subsets concatenated
+     * */
     function getCharacterSet(){
         let result_set = {
             subsets: [], //individual subset strings
@@ -298,6 +423,11 @@ function generatePassword(){
         return result_set;
     }
 
+    /** takes a string and hashes it N times with the crypto.subtle.digest function
+     * @param {string} message - string to encrypt
+     * @param {number} N - number of times to run digest function
+     * @returns {ArrayBuffer} - a 512 bit ArrayBuffer representing the digested message
+     * */
     async function hashNTimes_SHA512(message, N){
         const msgBuffer = new TextEncoder('utf-8').encode(message);
 
@@ -311,7 +441,10 @@ function generatePassword(){
         return hashBuffer;
     }
 
-
+    /** encode the array buffer with the given character set
+     * @param {ArrayBuffer} array_buffer - the 512 bit array buffer that is the result of the hashNTimes_SHA512 function
+     * @param {object} character_set_selection - the object that is the result of the getCharacterSet function
+     * */
     function encode_with_character_set(array_buffer, character_set_selection){
         //turn array buffer into uint8array
         const hashArray = Array.from(new Uint8Array(array_buffer));
@@ -321,7 +454,7 @@ function generatePassword(){
 
         /*To ensure that even with short password lengths (minimum 4), at least 1 character from each selected set is present we do the following:
         * 1 set selected: We simply encode using this one set, no problem.
-        * 2 sets selected: 1st character from the first set, 2nd from the second set, the rest from the complete set (i.e. all the subsets concatenated)
+        * 2 sets selected: 1st character from the first set, 2nd from the second set, the rest from the common set (i.e. the 2 subsets concatenated)
         * 3 sets selected: 1st char from 1st set, 2nd char from 2nd set, 3rd char from 3rd set, the rest from the common set
         * 4 sets selected: 1st char from 1st set, 2nd char from 2nd set, 3rd char from 3rd set, 4th char from 4th set, the rest from the common set
         *
@@ -354,86 +487,24 @@ function generatePassword(){
         });
 }
 
-/*
-* Find an entry using domain as key in the database
-* returns: Promise that resolves with an object returned by the database
-*
-* caution: if the object is NOT found, it will still successfully resolve but with undefined as the value
-* */
-function getPreferenceForDomainFromDatabase(domain){
-    return new Promise((resolve, reject) => {
-        if(indiPrefDB === undefined){
-            resolve(undefined);
-        }
+/** Returns an array of possible service name options derived from the subdomains. For example:
+ * developer.mozilla.org -> ["mozilla", "developer.mozilla"]
+ * a.b.c.d.[publicsuffix] -> ["d", "c.d", "b.c.d", "a.b.c.d"]
+ *
+ * @param {string} domain - the domain that was already extracted beforehand during initialization
+ * @returns {Array} - an array of possible service name options derived from the subdomains*/
+function getSubdomainsOptions(domain){
+    //if there is an ip address in there, just return the IP address
+    let matchIpv4Address = domain.match(/(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(:\d{1,5})?/g);
+    if(matchIpv4Address != null){
+        return matchIpv4Address;
+    }
 
-        const transaction = indiPrefDB.transaction(["preferences"], "readonly");
-        const objStore = transaction.objectStore("preferences");
+    publicSuffixList.parse(suffListData, punycode.toASCII);
+    var publicSuffix = publicSuffixList.getPublicSuffix(domain);
 
-        const request = objStore.get(domain);
-        request.onerror = function(event){
-            reject(event.target.error);
-        }
-        request.onsuccess = function(event){
-            resolve(event.target.result);
-        }
-    });
-}
-
-function getPreferenceForServiceFromDatabase(service){
-    return new Promise((resolve, reject) => {
-        if(indiPrefDB === undefined){
-            resolve(undefined);
-        }
-
-        const transaction = indiPrefDB.transaction(["preferences"], "readonly");
-        const objStore = transaction.objectStore("preferences");
-
-        console.log(`searching in the index for ${service}`);
-
-        const index = objStore.index("service");
-        const getReq = index.get(service);
-        getReq.onerror = function(event){
-            reject(event.target.error);
-        }
-        getReq.onsuccess = function(event){
-            resolve(event.target.result);
-        }
-    });
-}
-
-function getAllServiceNames(){
-    return new Promise((resolve, reject) => {
-        if(indiPrefDB === undefined){
-            resolve([]);
-        }
-
-        const transaction = indiPrefDB.transaction(["preferences"], "readonly");
-        const objStore = transaction.objectStore("preferences");
-
-        console.log(`Getting all service names... `);
-        const result = [];
-
-        const index = objStore.index("service");
-        const getReq = index.openCursor(null, "nextunique");
-        getReq.onerror = function(event){
-            reject(event.target.error);
-        }
-        getReq.onsuccess = function(event){
-            const cursor = event.target.result;
-            if(cursor) {
-                result.push(cursor.key);
-                cursor.continue();
-            }
-            else{
-                resolve(result);
-            }
-        }
-    });
-}
-
-function getSubdomainsOptions(domain, service_name){
-    var splittedDomain = domain.split(".");
-    var subdomains = splittedDomain.slice(0, splittedDomain.indexOf(service_name)); // array of subdomains without public suffix
+    var splittedDomain = domain.split("."); console.log(splittedDomain);
+    var subdomains = splittedDomain.slice(0, splittedDomain.indexOf(publicSuffix)); // array of subdomains without public suffix
 
     var optionstring = new String();
     let result = [];
@@ -442,10 +513,23 @@ function getSubdomainsOptions(domain, service_name){
         result.push(optionstring);
         optionstring = "." + optionstring;
     }
+    // console.log(`The possible subdomains are: `);
+    // console.log(result);
     return result;
 }
 
+/** sets the rest of the details of the UI after the data has been loaded, such as the Generate button, the pwd options container,
+ * the stored indicator badges, the password slider length label, and the datalist for the service input
+ *
+ * @param {Array} allServicesArray - an array of all the service names for the active profile
+ * @returns {void}*/
 function displayUIDetails(allServicesArray){
+    //disable saving in incognito mode
+    if(browser.extension.inIncognitoContext){
+        DOM_store_preference.checked = false;
+        DOM_store_preference.disabled = true;
+    }
+
     //"generate and save" button
     if(DOM_store_preference.checked){
         document.getElementById("home-generate_password-btn").innerText = "Generate & Save";
@@ -461,7 +545,7 @@ function displayUIDetails(allServicesArray){
 
     //show "these are saved preferences" badges
     if(isStored.domain){
-       document.getElementById("stored_domain-tag").style.display = "inline";
+       document.getElementById("stored_domain-tag").style.display = "block";
     }
     else{
         document.getElementById("stored_domain-tag").style.display = "none";
@@ -486,14 +570,19 @@ function displayUIDetails(allServicesArray){
         datalist.append(option);
     });
 
-    DOM_generated_password.value = "";
+
     document.getElementById("home-update_warning-container").hidden = true;
 
 }
 
 // ----------------------- MAIN FUNCTION AND/OR EVENT HANDLERS DEFINITIONS ------------------------------
+/**initialize the popup
+ * @returns {void}*/
 async function initialize(){
     console.log(`Initializing!`);
+
+    DOM_user_password.value = "";
+    DOM_generated_password.value = "";
 
     //catch the errors here too!
     suffListData = await browser.storage.local.get("publicsuffix").then(result => result.publicsuffix.data);
@@ -531,7 +620,7 @@ async function initialize(){
     else {
         document.getElementById("popup-encryption_pwd").hidden = true;
 
-        try {
+        try {//in case indiPrefDB is undefined
             //nacitaj vsetky indiPref aktualneho profilu
             indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, encryptionPassword.getPasswordForID(preferencesDefault.id));
         }catch (error){
@@ -542,6 +631,8 @@ async function initialize(){
     }
 }
 
+/** resumes the initialization process after the user enters his decryption password for the profile, if it was needed
+ * @returns {void}*/
 async function encryptionPasswordInputHandler(){
     const input = document.getElementById("encryption_pwd-input");
     const password = input.value;
@@ -549,8 +640,10 @@ async function encryptionPasswordInputHandler(){
     console.log(`This is the password we got: ${password}`);
 
     try {
-        console.log(`Getting the preferences for ${preferencesDefault.profile} with id ${preferencesDefault.profile}`);
-        indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, password);
+        if(indiPrefDB !== undefined){ //only proceed if database is not undefined, otherwise it'd throw an error
+            console.log(`Getting the preferences for ${preferencesDefault.profile} with id ${preferencesDefault.profile}`);
+            indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, password); //this will throw an error if decryption fails
+        }
 
         encryptionPassword.passwords.push({profile_id: preferencesDefault.id, password: password});
 
@@ -559,23 +652,27 @@ async function encryptionPasswordInputHandler(){
 
         //insert the same password in the password field
         DOM_user_password.value = password;
-        DOM_user_password.focus();
+        DOM_user_password.select();
 
         //fill the UI with the preferences that were decrypted
         fillUIWithPreferences();
     } catch(error){
         console.log(error);
-        displayError("Decryption error");
+        displayAlert("Decryption error", "danger", 3);
     }
 }
 
+/** Part of initialization. Gets the preferences from the global variables (indiPrefs and defaultPreferences),
+ * which have been initialized and filled previously, so that it can fill the UI.
+ * @returns {void}
+ * */
 async function fillUIWithPreferences() {
     // LOADING THE PREFERENCES
     //check if there is a preference for this domain, if not, load the default preferences
     const domain = DOM_domain_name.innerText;
     const service_name = DOM_domain_main_part.value;
 
-    const prefFromDB = getPrefForDomain();
+    const prefFromDB = getPrefForDomain(domain);
     const prefDefault = preferencesDefault;
 
     if (prefFromDB === undefined) {
@@ -609,16 +706,20 @@ async function fillUIWithPreferences() {
     DOM_store_preference.checked = prefDefault.save_preferences;
 
     //ADDING THE AUTOFILL
-    // const subdomainslist = getSubdomainsOptions(domain);
-    // console.log(`Subdomains options: `);
-    // console.log(subdomainslist, service_name);
+    const subdomainslist = getSubdomainsOptions(domain);
+    const allServices = getAllServices();
 
-    const allServicesArray = getAllServices();
-    // allServicesArray.unshift.apply(this, subdomainslist);
+    let serviceNameOptionsArray = subdomainslist.concat(allServices);
+    //filter out duplicates
+    serviceNameOptionsArray = serviceNameOptionsArray.filter((el, index, thisArray) => {
+       return thisArray.indexOf(el) === index;
+    });
 
-    displayUIDetails(allServicesArray);
+    displayUIDetails(serviceNameOptionsArray);
 }
 
+/**Sets the inputs in the UI - password encoding and password length
+ * @param {object} prefs - preference object containing the PasswordEncoding, constant and length*/
 function setPasswordPreferencesInHomepageUI(prefs){
     DOM_constant.value = prefs.constant;
 
@@ -629,7 +730,10 @@ function setPasswordPreferencesInHomepageUI(prefs){
     DOM_password_length.value = prefs.length;
     DOM_password_length_label.innerText = prefs.length;
 }
-
+/** fill the profile select in the UI with the names of the profiles and sets the active profile as selected
+ * @param {Array} preferences - an array containing all the DefaultPreferences objects (each representing a profile)
+ * @param {number} activeProfileId - the id of the active profile
+ * */
 function fillProfileSelect(preferences, activeProfileId){
     const select = document.getElementById("heading-profile_select");
     select.innerHTML = "";
@@ -646,24 +750,45 @@ function fillProfileSelect(preferences, activeProfileId){
 }
 
 //take the error place and append some error elements with children
-function displayError(error_text){
-    const errors_container = document.getElementById("errors-container");
+/** Takes an error message and displaus the error in the UI
+ * @param {string} alert_text - alert message
+ * @param {string} alert_type - type of alert - danger, success, warning, etc.
+ * @param {number} display_time - the length of time to keep the alert displayed for
+ * @returns {void}*/
+function displayAlert(alert_text, alert_type, display_time){
+    const alerts_container = document.getElementById("alerts-container");
 
-    const myError = document.createElement("div");
+    switch(alert_type){
+        case "danger": css_type = "alert-danger"; break;
+        case "success": css_type = "alert-success"; break;
+        case "info": css_type = "alert-info"; break;
+        case "warning": css_type = "alert-warning"; break;
+    }
+
+    const newAlert = document.createElement("div");
     const span = document.createElement("span");
     span.classList.add("close_alert-btn");
     span.innerHTML = "&times;";
     span.addEventListener("click", function(){this.parentElement.style.display='none'});
 
-    myError.classList.add("alert", "alert-danger");
-    myError.appendChild(span);
-    myError.appendChild(document.createTextNode(error_text));
+    newAlert.classList.add("alert", css_type);
+    newAlert.innerHTML = alert_text;
+    newAlert.appendChild(span);
 
-    errors_container.appendChild(myError);
-    setTimeout(function(){myError.style.opacity = 0;}, 3000);
-    setTimeout(function(){errors_container.removeChild(myError)}, 4000);
+    alerts_container.appendChild(newAlert);
+    if(display_time !== undefined) {
+        setTimeout(function () {
+            newAlert.style.opacity = 0;
+        }, display_time * 1000);
+        setTimeout(function () {
+            alerts_container.removeChild(newAlert)
+        }, display_time * 1000 + 500);
+    }
 }
 
+/** displays the warning container warning the user about a potential change in the saved preferences
+ * @param {string} argument - argument can be either "change" or "no-change"
+ * @returns {void} */
 function displayPotentialChangeInStorageWarning(argument){
     if(argument == "change") {
         document.getElementById("home-update_warning-container").hidden = false;
@@ -673,6 +798,8 @@ function displayPotentialChangeInStorageWarning(argument){
     }
 }
 
+/** Selects the text in the generated password input field and copies it to the clipboard
+ * @returns {void}*/
 function copyGeneratePwdToClipboard(){
     console.log(`Copying generated password to clipboard...`);
     DOM_generated_password.type = "text";
@@ -681,6 +808,9 @@ function copyGeneratePwdToClipboard(){
     DOM_generated_password.type = "password";
 }
 
+/** Handles the user input - pressing enter key on the user input field, or pressing the generate button.
+ * Calls the relevant functions such as generatePassword or displayError, etc.
+ * @param {Event} event*/
 function generatePasswordHandler(event){
     if(!event.isTrusted){
         return;
@@ -689,19 +819,19 @@ function generatePasswordHandler(event){
     let invalidInput = false;
     if(DOM_user_password.value == ""){
         //notify about the error
-        displayError("Pasword field is empty."); invalidInput = true;
+        displayAlert("Pasword field is empty.", "danger", 3); invalidInput = true;
     }
     //validate password length - redundant because we're using the slider anyway
     if(isNaN(DOM_password_length.value)  || DOM_password_length.value < 4 || DOM_password_length.value > 64){
-        displayError("Invalid password length. Password length must be a number in the range of 4 and 64."); invalidInput = true;
+        displayAlert("Invalid password length. Password length must be a number in the range of 4 and 64.", "danger", 3); invalidInput = true;
     }
     //validate that at least one character set was chosen
     if(!DOM_checkbox_lower_case.checked && !DOM_checkbox_upper_case.checked
         && !DOM_checkbox_numbers.checked && !DOM_checkbox_special_chars.checked){
-        displayError("No character set chosen."); invalidInput = true;
+        displayAlert("No character set chosen.", "danger", 3); invalidInput = true;
     }
     if(DOM_domain_main_part.value == ""){
-        displayError("Service field is empty."); invalidInput = true;
+        displayError("Service field is empty.", "danger", 3); invalidInput = true;
     }
 
     if(invalidInput){
@@ -717,6 +847,7 @@ function generatePasswordHandler(event){
             console.log(`Inserting generated password into content page...`);
             browser.tabs.query({active: true, currentWindow: true})
                 .then(tabs => {
+                    browser.tabs.executeScript(tabs[0].id, {file: "/browser-polyfill.js"});
                     browser.tabs.executeScript(tabs[0].id, {file: "/content_scripts/content_script.js"}).then(array => {
                         browser.tabs.sendMessage(tabs[0].id, {
                             message: "inject",
@@ -732,7 +863,7 @@ function generatePasswordHandler(event){
     });
 
     //store if desired
-    if(DOM_store_preference.checked){
+    if(DOM_store_preference.checked && event.key !== 'Enter'){
         //store rule in database
         storePrefInDB();
     }
@@ -742,6 +873,9 @@ function generatePasswordHandler(event){
 
 }
 
+/** Handles the event, where the user changes the service name. Tries to get the individual preference for that service and changes the displayed settings accordingly.
+ * @param {Event}
+ * @returns {void}*/
 async function changeInServiceNameHandler(event){
     console.log("Service name change handler...");
 
@@ -774,6 +908,9 @@ async function changeInServiceNameHandler(event){
 }
 
 /*Check if by saving the new preferences, we would be changing any stored preferences for the given service*/
+/** Handles the event of changing the displayed preferences. Checks whether saving the preferences as displayed in the UI would overwrite existing preferences for the service in the database.
+ * If so it will display a warning via the potentialChangeInStorageWarning function.
+ * @returns {void}*/
 function potentialUpdateOfPreferencesHandler(){
     if(DOM_store_preference.checked){
         document.getElementById("home-generate_password-btn").innerText = "Generate & Save";
@@ -808,6 +945,9 @@ function potentialUpdateOfPreferencesHandler(){
     }
 }
 
+/**Handles the event of changing the profile. Sets the activeProfile in the browser.storage and reinitializes the popup.
+ * @param {Event}
+ * @returns {void}*/
 function profileChangeHandler(event){
     const select = event.target;
     const newActiveProfileID = select.value;
@@ -828,10 +968,19 @@ function profileChangeHandler(event){
 }
 
 let qrcode;
+/** Displays the QR code from the text within the generated password input field.  */
 function showQRCode(){
     if(DOM_generated_password.value == ""){
         return;
     }
+
+    window.setTimeout(function(){
+        if(qrcode_container.innerHTML != ""){
+            underlay.hidden = true;
+            qrcode_container.innerHTML = "";
+            qrcode.clear();
+        }
+    }, 5000);
 
     const underlay = document.getElementById("qrcode-underlay");
     const qrcode_container = document.getElementById("qrcode");
@@ -850,13 +999,7 @@ function showQRCode(){
     });
     // }
 
-    window.setTimeout(function(){
-        if(qrcode_container.innerHTML != ""){
-            underlay.hidden = true;
-            qrcode_container.innerHTML = "";
-            qrcode.clear();
-        }
-        }, 5000);
+
 }
 
 // ------------------------- FUNCTION CALLS AND EVENT LISTENERS ----------------------------
@@ -925,6 +1068,3 @@ document.getElementById("copy-generated-pwd-btn").addEventListener("click", copy
 * it's going to load the same preferences for abc.com and abc.eu despite the fact that they have different domains. - ofc this might be better in the sense that it will
 * alert the user to the fact that these domains are different and that he will need to save on of them under a separate service name.
 * */
-
-//TODO: deal with incognito mode
-//TODO: localize!!!

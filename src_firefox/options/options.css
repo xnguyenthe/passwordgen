@@ -1,9 +1,19 @@
-.all-profiles-container {
+body {
+    margin: 0.5em;
+}
+
+.all_profiles-container {
     display: grid;
     grid-template-columns: auto auto;
     row-gap: 0.2em;
     justify-content: space-between;
     margin: 1em;
+}
+
+.all_profiles-profile-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.2em;
 }
 
 #profile-select {
@@ -13,27 +23,74 @@
 
 .export-section-container {
     display: grid;
-    grid-template-columns: auto auto;
+    grid-template-columns: 1fr 1fr;
     row-gap: 0.5em;
     justify-content: space-between;
     margin: 1em;
+}
+
+.export-section-container div{
+    grid-column-start: span 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.export-section-container *:nth-child(2){
+    justify-self: start;
 }
 
 .import-section-container{
     display: grid;
-    grid-template-columns: auto auto;
+    grid-template-columns: 1fr 1fr;
     row-gap: 0.5em;
     justify-content: space-between;
     margin: 1em;
 }
 
-.encryption_password-container {
+.import-section-container *:nth-child(2){
+    justify-self: start;
+}
+
+.decryption_password-container {
     background-color: lightcoral;
     padding: 1em;
     margin: 0.5em;
 }
 
+.password-prompt {
+    background-color: lightcoral;
+    padding: 0.5em;
+    margin: 0.5em;
+}
+
 .material-icons.md-18 { font-size: 18px; }
+
+/*@keyframes save-button-animate {*/
+/*    0% {background-color: red}*/
+/*    50% {background-color: orange}*/
+/*    100% {background-color: red}*/
+/*}*/
+
+#save_changes-btn {
+    width: 10em;
+    text-align: center;
+}
+
+#save_changes-btn.changed {
+    /*animation-name: save-button-animate;*/
+    /*animation-duration: 2s;*/
+    /*animation-iteration-count: infinite;*/
+
+    background-color: red;
+    color: white;
+    /*font-weight: bold;*/
+    /*border-radius: 5px;*/
+}
+
+table {
+    margin-top: 1em;
+    width: 100%;
+}
 
 table input[type=text] {
     /*width: 12em;*/
@@ -43,12 +100,12 @@ table input[type=text] {
 table input.number {
     box-sizing: border-box;
     text-align: center;
-    width: 3em;
+    width: 2em;
 }
 
 table input {
     margin: auto;
-    width: 80%;
+    width: 90%;
     border: 0;
 }
 
@@ -64,18 +121,14 @@ table input {
     color: lightslategrey;
 }
 
-table {
-    width: 100%;
-}
-
 td {
-    box-sizing: border-box;
+    /*box-sizing: border-box;*/
     /*display: inline-flex;*/
     /*border-left: 1px solid grey;*/
     /*margin: 0;*/
     /*padding: 0;*/
     /*border-width: 0;*/
-    border-radius: 10px;
+    /*border-radius: 10px;*/
     /*border: 1px solid black;*/
     /*background-color: lightgrey;*/
 }
@@ -130,12 +183,22 @@ thead th{
 .alert {
     padding: 10px;
     color: white;
-    margin-bottom: 15px;
+    margin-top: 5px;
+    margin-bottom: 5px;
     opacity: 1;
     transition: opacity 0.6s;
 }
 .alert-danger {
     background-color: #f44336; /* Red */
+}
+.alert-success {
+    background-color: #04AA6D; /* Green */
+}
+.alert-info {
+    background-color: #0095dd; /* Blue */
+}
+.alert-warning {
+    background-color: orange; /* orange */
 }
 
 /* The close button */

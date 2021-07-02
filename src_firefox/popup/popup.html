@@ -27,7 +27,7 @@
     </header>
 
     <main>
-        <div id="errors-container"> </div>
+        <div id="alerts-container"> </div>
         <div id="popup-encryption_pwd">
             Enter password for decryption:
             <input id="encryption_pwd-input" type="password"/>
@@ -35,7 +35,10 @@
         </div>
         <div id="popup-home">
             <div class="container flex-column">
-                <div class="label-tag-row"><span id="home-domain-span">www.example.com</span><span id="stored_domain-tag" style="display:none" class="material-icons md-18">turned_in</span></div>
+                <div class="label-tag-row">
+                    <span id="home-domain-span">www.example.com</span>
+                    <span id="stored_domain-tag" style="display:none" class="material-icons md-18">turned_in</span>
+                </div>
                 
                 <div class="label-tag-row">
                     <label for="home-service_name-input" id="home-service_name-label">Service: </label>
@@ -43,14 +46,14 @@
                 </div>
                 <input id="home-service_name-input" value="example" list="home-service_name-datalist"/>
                 <datalist id="home-service_name-datalist">
-
                 </datalist>
+
                 <label for="home-user_password-input" id="home-user_password-label">Password: </label>
                 <input id="home-user_password-input" type="password" autofocus/>
                 <!--   password generation options     -->
                 <div>
                     <span id="home-pwd_container-heading">Password options</span>
-                    <span id="btn-show-defaults"  class="material-icons pointer">tune</span>
+                    <span id="btn-show-defaults"  class="material-icons pointer dim-on-hover">tune</span>
                 </div>
                 <section id="home-pwd_options" class="pwd_options_container">
                     <input id="home-constant-input-hidden" type="text" hidden/>
@@ -79,7 +82,7 @@
                 </section>
                 <!--    end password generation options    -->
                 <div id="home-update_warning-container" class="warning_note" hidden>
-                    <p><strong id="home-update_warning-label">Warning!</strong>You're about to change the preferences for the service: insert_service_name</p>
+                    <p><strong id="home-update_warning-label">Warning! </strong>You're about to change the saved preference for this service.</p>
                 </div>
                 <section id="save_and_generate_row">
                     <label for="home-save_this_preference" class="icon_container">

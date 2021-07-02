@@ -1,40 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>JSDoc: Source: oauth_authorize.js</title>
-
-    <script src="scripts/prettify/prettify.js"> </script>
-    <script src="scripts/prettify/lang-css.js"> </script>
-    <!--[if lt IE 9]>
-      <script src_firefox="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
-    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
-</head>
-
-<body>
-
-<div id="main">
-
-    <h1 class="page-title">Source: oauth_authorize.js</h1>
-
-    
-
-
-
-    
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>const REDIRECT_URL = browser.identity.getRedirectURL();
+const REDIRECT_URL = browser.identity.getRedirectURL();
 const CLIENT_ID = "986394819940-iti4sheoj3v11e9j8qblrc0t00u2it31.apps.googleusercontent.com"; //OAUth client ID - from google's developer console
 const SCOPES = ["https://www.googleapis.com/auth/drive.file"]; //full list of scopes: https://developers.google.com/identity/protocols/oauth2/scopes
 const AUTH_URL =
     `https://accounts.google.com/o/oauth2/v2/auth` +
     `?client_id=${CLIENT_ID}` +
-    `&amp;response_type=token` + // response_type=token &lt;- we're using the implicit grant flow here
-    `&amp;redirect_uri=${encodeURIComponent(REDIRECT_URL)}` +
-    `&amp;scope=${encodeURIComponent(SCOPES.join(' '))}`;
+    `&response_type=token` + // response_type=token <- we're using the implicit grant flow here
+    `&redirect_uri=${encodeURIComponent(REDIRECT_URL)}` +
+    `&scope=${encodeURIComponent(SCOPES.join(' '))}`;
 
 const VALIDATION_BASE_URL="https://www.googleapis.com/oauth2/v3/tokeninfo";
 
@@ -46,11 +18,10 @@ const VALIDATION_BASE_URL="https://www.googleapis.com/oauth2/v3/tokeninfo";
 */
 function extractAccessToken(redirectUri) {
     let m = redirectUri.match(/[#?](.*)/);
-    //d
-    console.log("This is the regex match result for the redirectURI:");
-    console.log(m);
-    //ed
-    if (!m || m.length &lt; 1)
+
+    console.log(redirectUri);
+
+    if (!m || m.length < 1)
         return null;
     let params = new URLSearchParams(m[1].split("#")[0]);
     if(!params.get("access_token")){
@@ -73,7 +44,7 @@ function extractAccessToken(redirectUri) {
  Note that the Google page talks about an "audience" property, but in fact
  it seems to be "aud".
 
- @param {string} the access token
+ @param {string} accessToken - the access token
  @returns {Promise} a Promise which resolves with the valid access token, or rejects if the the token is invalid
  */
 function validate(accessToken) {
@@ -94,7 +65,7 @@ function validate(accessToken) {
                 console.log(json);
                 //ed
 
-                if (json.aud &amp;&amp; (json.aud === CLIENT_ID)) {
+                if (json.aud && (json.aud === CLIENT_ID)) {
                     //e
                     console.log(`successfully validated the token`);
                     //ed
@@ -129,7 +100,7 @@ function getAccessToken(){
     console.log("getting access token...");
     //ed
 
-    if(localStorage.getItem("accessToken") &amp;&amp; localStorage.getItem("accessToken") != ""){
+    if(localStorage.getItem("accessToken") && localStorage.getItem("accessToken") != ""){
         //d
         console.log(`validating stored token: ${localStorage.getItem("accessToken")}`);
         //ed
@@ -149,7 +120,7 @@ function listFiles(){
     function sendRequestToAPI(accessToken){
 
         const queryString = "name = 'passwordgen.txt'";
-        const requestURL = `https://www.googleapis.com/drive/v3/files?orderBy=modifiedByMeTime&amp;q=${encodeURIComponent(queryString)}`; //https://developers.google.com/drive/api/v3/reference/files/list
+        const requestURL = `https://www.googleapis.com/drive/v3/files?orderBy=modifiedByMeTime&q=${encodeURIComponent(queryString)}`; //https://developers.google.com/drive/api/v3/reference/files/list
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
         //requestHeaders.append('Accept', 'application/json');
@@ -181,15 +152,22 @@ function listFiles(){
 const FILE_NAME = "passwordgen.txt";
 
 /**
- * takes the content and puts it send it to google drive. If there are no files in the drive which belong to this app, it will create a new one. If there already is a file,
+ * Takes the content and sends it to google drive. If there are no files in the drive which belong to this app, it will create a new one. If there already is a file,
  * it will update that file. See more at: https://developers.google.com/drive/api/v3/reference/files/create
+ * Will throw an error if the authorization process fails.
  * @param {object} content - json object, which is then stringified and put to drive
  * @returns {Promise} A promise as a result of using fetch which should resolve with the file id in the drive.
  * */
 async function putFileToDrive(content){
 
+    //if getting the access token fails (for example user aborts authorization), it'll throw an error "Error: User cancelled or denied access."
+    //i.e., this async function puFileToDrive will also abort and throw that error
     const accessToken = await getAccessToken();
     const files_in_drive = await listFiles();
+
+    //this random hex string is used as a boundary in the multipart request body - just so we decrease the chance of the content containing "--boundary" and messing up the request
+    const randomString = Math.random().toString(16).substr(2, 8);
+    const boundary = `boundary${randomString}`;
 
     console.log(`PasswordGen's files in drive are: `);
     console.log(files_in_drive);
@@ -199,16 +177,16 @@ async function putFileToDrive(content){
         const requestURL = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
-        requestHeaders.append('Content-Type', 'multipart/related;boundary=boundary');
+        requestHeaders.append('Content-Type', `multipart/related;boundary=${boundary}`);
 
         const requestBody =
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: application/json;charset=UTF-8\n\n' +
             `{"name": "${FILE_NAME}"}\n` +
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: text/plain\n\n' +
             JSON.stringify(content, null, 4) + '\n' +
-            '--boundary--';
+            `--${boundary}--`;
 
         const driveRequest = new Request(requestURL, {
             method: "POST",
@@ -219,7 +197,9 @@ async function putFileToDrive(content){
         console.log("Creating a new file in Google Drive");
         return fetch(driveRequest).then((response) => {
             if (response.status === 200) {
-                return response.json();
+                let resp = response.json();
+                console.log(resp);
+                return resp;
             } else {
                 throw response.status;
             }
@@ -234,16 +214,16 @@ async function putFileToDrive(content){
         const requestURL = `https://www.googleapis.com/upload/drive/v3/files/${fileToUpdateID}?uploadType=multipart`;
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
-        requestHeaders.append('Content-Type', 'multipart/related;boundary=boundary');
+        requestHeaders.append('Content-Type', `multipart/related;boundary=${boundary}`);
 
         const requestBody =
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: application/json;charset=UTF-8\n\n' +
             `{"name": "${FILE_NAME}"}\n` +
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: text/plain\n\n' +
             JSON.stringify(content, null, 4) + '\n' +
-            '--boundary--';
+            `--${boundary}--`;
 
         const driveRequest = new Request(requestURL, {
             method: "PATCH",
@@ -253,8 +233,11 @@ async function putFileToDrive(content){
 
         return fetch(driveRequest).then((response) => {
             if (response.status === 200) {
-                return response.json();
+                let resp = response.json();
+                console.log(resp);
+                return resp;
             } else {
+                console.log(response);
                 throw response.status;
             }
         });
@@ -262,6 +245,7 @@ async function putFileToDrive(content){
 }
 
 /** Gets the contents of the newest file from drive.
+ * Will throw an error if authorization fails.
  * @returns {Promise} promise which resolves with the text content of the file or an empty object*/
 async function getFileFromDrive(){
     const accessToken = await getAccessToken();
@@ -290,29 +274,6 @@ async function getFileFromDrive(){
     }
     else {
         console.log("No file found in Drive, returning empty object...");
-        return {};
+        throw "No back-up file found";
     }
 }
-</code></pre>
-        </article>
-    </section>
-
-
-
-
-</div>
-
-<nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#addProfile">addProfile</a></li><li><a href="global.html#allPreferencesArray">allPreferencesArray</a></li><li><a href="global.html#allProfilesDefaults">allProfilesDefaults</a></li><li><a href="global.html#changeActiveProfileHandler">changeActiveProfileHandler</a></li><li><a href="global.html#changeInServiceNameHandler">changeInServiceNameHandler</a></li><li><a href="global.html#changePasswordSettings">changePasswordSettings</a></li><li><a href="global.html#changeProfileName">changeProfileName</a></li><li><a href="global.html#changeServiceName">changeServiceName</a></li><li><a href="global.html#CHARACTER_SETS">CHARACTER_SETS</a></li><li><a href="global.html#copyGeneratePwdToClipboard">copyGeneratePwdToClipboard</a></li><li><a href="global.html#decode">decode</a></li><li><a href="global.html#decrypt">decrypt</a></li><li><a href="global.html#deleteAllStoredPreferences">deleteAllStoredPreferences</a></li><li><a href="global.html#deleteDomain">deleteDomain</a></li><li><a href="global.html#deleteEntryForProfileFromDB">deleteEntryForProfileFromDB</a></li><li><a href="global.html#deleteProfile">deleteProfile</a></li><li><a href="global.html#deleteService">deleteService</a></li><li><a href="global.html#displayCurrentDefaultPreferences">displayCurrentDefaultPreferences</a></li><li><a href="global.html#displayError">displayError</a></li><li><a href="global.html#displayPotentialChangeInStorageWarning">displayPotentialChangeInStorageWarning</a></li><li><a href="global.html#displayPreferences">displayPreferences</a></li><li><a href="global.html#displayProfiles">displayProfiles</a></li><li><a href="global.html#displayProfileSelect">displayProfileSelect</a></li><li><a href="global.html#displayUIDetails">displayUIDetails</a></li><li><a href="global.html#downloadFromGDrive">downloadFromGDrive</a></li><li><a href="global.html#ejectDomain">ejectDomain</a></li><li><a href="global.html#encode">encode</a></li><li><a href="global.html#encrypt">encrypt</a></li><li><a href="global.html#encryptionPassword">encryptionPassword</a></li><li><a href="global.html#encryptionPasswordInputHandler">encryptionPasswordInputHandler</a></li><li><a href="global.html#exportPreferences">exportPreferences</a></li><li><a href="global.html#extractAccessToken">extractAccessToken</a></li><li><a href="global.html#FILE_NAME">FILE_NAME</a></li><li><a href="global.html#fillProfileSelect">fillProfileSelect</a></li><li><a href="global.html#fillUIWithPreferences">fillUIWithPreferences</a></li><li><a href="global.html#generatePassword">generatePassword</a></li><li><a href="global.html#generatePasswordHandler">generatePasswordHandler</a></li><li><a href="global.html#get_main_domain_or_ip">get_main_domain_or_ip</a></li><li><a href="global.html#get_url_without_protocol_or_path">get_url_without_protocol_or_path</a></li><li><a href="global.html#getAccessToken">getAccessToken</a></li><li><a href="global.html#getAllIndiPrefsForActiveProfile">getAllIndiPrefsForActiveProfile</a></li><li><a href="global.html#getAllPrefsForProfileFromDB">getAllPrefsForProfileFromDB</a></li><li><a href="global.html#getAllServices">getAllServices</a></li><li><a href="global.html#getDefaultPreferences">getDefaultPreferences</a></li><li><a href="global.html#getExportData">getExportData</a></li><li><a href="global.html#getFileFromDrive">getFileFromDrive</a></li><li><a href="global.html#getKey">getKey</a></li><li><a href="global.html#getKeyMaterial">getKeyMaterial</a></li><li><a href="global.html#getPrefForDomain">getPrefForDomain</a></li><li><a href="global.html#getPrefForService">getPrefForService</a></li><li><a href="global.html#HASH_N_TIMES">HASH_N_TIMES</a></li><li><a href="global.html#importSettings">importSettings</a></li><li><a href="global.html#indiPrefDB">indiPrefDB</a></li><li><a href="global.html#indiPrefs">indiPrefs</a></li><li><a href="global.html#initDefaultPreferences">initDefaultPreferences</a></li><li><a href="global.html#initExtension">initExtension</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initIndiPrefDB">initIndiPrefDB</a></li><li><a href="global.html#initPublicSuffDataStorage">initPublicSuffDataStorage</a></li><li><a href="global.html#insertDefaultSettings">insertDefaultSettings</a></li><li><a href="global.html#isProfileNameValid">isProfileNameValid</a></li><li><a href="global.html#isStored">isStored</a></li><li><a href="global.html#isValidImportedJSON">isValidImportedJSON</a></li><li><a href="global.html#launchAuthFlow">launchAuthFlow</a></li><li><a href="global.html#listFiles">listFiles</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#openIndiPrefDB">openIndiPrefDB</a></li><li><a href="global.html#potentialUpdateOfPreferencesHandler">potentialUpdateOfPreferencesHandler</a></li><li><a href="global.html#preferenceForService">preferenceForService</a></li><li><a href="global.html#preferencesDefault">preferencesDefault</a></li><li><a href="global.html#profileChangeHandler">profileChangeHandler</a></li><li><a href="global.html#putFileToDrive">putFileToDrive</a></li><li><a href="global.html#putIndiPrefsForProfileInDB">putIndiPrefsForProfileInDB</a></li><li><a href="global.html#refillIndiPrefsOfProfileInDB">refillIndiPrefsOfProfileInDB</a></li><li><a href="global.html#saveModifiedTable">saveModifiedTable</a></li><li><a href="global.html#setPasswordPreferencesInHomepageUI">setPasswordPreferencesInHomepageUI</a></li><li><a href="global.html#showPopupAbout">showPopupAbout</a></li><li><a href="global.html#showPopupDefaults">showPopupDefaults</a></li><li><a href="global.html#showPopupHome">showPopupHome</a></li><li><a href="global.html#showQRCode">showQRCode</a></li><li><a href="global.html#sortAllPreferencesArray">sortAllPreferencesArray</a></li><li><a href="global.html#storePrefInDB">storePrefInDB</a></li><li><a href="global.html#toggleAllDomainsRows">toggleAllDomainsRows</a></li><li><a href="global.html#toggleDomainsRow">toggleDomainsRow</a></li><li><a href="global.html#toggleEncryptProfile">toggleEncryptProfile</a></li><li><a href="global.html#updatePreferencesHandler">updatePreferencesHandler</a></li><li><a href="global.html#uploadToGDrive">uploadToGDrive</a></li><li><a href="global.html#validate">validate</a></li></ul>
-</nav>
-
-<br class="clear">
-
-<footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Jun 15 2021 04:39:48 GMT+0200 (Central European Summer Time)
-</footer>
-
-<script> prettyPrint(); </script>
-<script src="scripts/linenumber.js"> </script>
-</body>
-</html>

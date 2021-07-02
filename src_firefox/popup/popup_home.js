@@ -1,32 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>JSDoc: Source: popup_home.js</title>
-
-    <script src="scripts/prettify/prettify.js"> </script>
-    <script src="scripts/prettify/lang-css.js"> </script>
-    <!--[if lt IE 9]>
-      <script src_firefox="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
-    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
-</head>
-
-<body>
-
-<div id="main">
-
-    <h1 class="page-title">Source: popup_home.js</h1>
-
-    
-
-
-
-    
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>/**
+/**
  * @typedef PasswordEncoding
  * @type {object}
  * @property {boolean} lower - lower case letters
@@ -74,7 +46,7 @@ const CHARACTER_SETS = {
     lower_case: "abcdefghijklmnopqrstuvwxyz",
     upper_case: "QWERTYUIOPASDFGHJKLZXCVBNM",
     numbers: "1234567890",
-    special_chars: '~!@#$%^&amp;*()_+{}:"|&lt;>?[];\'\\,./'
+    special_chars: '~!@#$%^&*()_+{}:"|<>?[];\'\\,./'
 };
 /** the number of times to run the hashing function when generating the password
  * @const {number}*/
@@ -84,12 +56,12 @@ let suffListData; //extracted suff list data from storage upon opening of the po
 let indiPrefDB; //DB object of the individual preferences upon opening of the popup
 
 /**
- * An array of all the IndividualPreference objects of the active profile
+ * An array of all the IndividualPreference objects of the active profile. Initialized as an empty array, in case we can't access the database.
  * @type {Array} */
 let indiPrefs = [];
 
-/** Filled with the preferences for *domain* upon initialization (if it can be found),
-*   and modified with the preferences for Service whenever the user changes the service field (if it can be found)
+/** Filled with the IndividualPreference for the *domain* upon initialization (if it can be found in DB),
+*   and updated with the preference for a *service* whenever the user changes the service field (if it can be found)
  *
  * @type {IndividualPreference}
 */
@@ -98,7 +70,8 @@ let preferenceForService = {};
 /** @type {DefaultPreferences} */
 let preferencesDefault = {};
 
-/** Contains boolean information about whether a preference has been saved for either the domain or service individually, or both at the same time.*/
+/** Contains boolean information about whether a preference has been saved for either the domain or service individually, or both at the same time.
+ * @type {object}*/
 let isStored = {
     domain: false,
     service: false
@@ -238,7 +211,7 @@ function getAllIndiPrefsForActiveProfile(db, profilePreference, decrypt_password
 /*return the preference object for domain if found, otherwise undefined*/
 /**
  * get the preference object for the specific domain from the global indiPrefs array
- * @returns {IndividualPreference}
+ * @returns {(IndividualPreference|undefined)} returns the preference object if it was found, otherwise undefined
  * */
 function getPrefForDomain(domain){
     console.log(`Getting preference for domain: ${domain}`);
@@ -248,7 +221,7 @@ function getPrefForDomain(domain){
 /*return the first preference object of a given service if found, otherwise undefined*/
 /**
  * get the first preference object for the specific service from the global indiPrefs array
- * @returns {IndividualPreference}
+ * @returns {(IndividualPreference|undefined)} returns the preference object if it was found, otherwise undefined
  * */
 function getPrefForService(service){
     return indiPrefs.find(el => el.service == service);
@@ -289,7 +262,6 @@ async function storePrefInDB(){
     preference.constant = DOM_constant.value; //get the constant here
 
     //put the preference for domain in the array
-    //change the preference for all the services with the same name in the array
     const indexOfPref = indiPrefs.findIndex(el => el.domain == preference.domain);
     if(indexOfPref != -1){
         //update the existing preference
@@ -300,6 +272,7 @@ async function storePrefInDB(){
         indiPrefs.push(preference);
     }
 
+    //change the preference for all the services with the same name in the array
     indiPrefs.forEach(el => {
         if(el.service == preference.service){
             el.encoding = preference.encoding;
@@ -327,10 +300,21 @@ async function storePrefInDB(){
         storeData = await encrypt(encryptionPassword.getPasswordForID(preferencesDefault.id), JSON.stringify(storeData));
     }
 
-    const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
-    const objStore = transaction.objectStore("preferences");
+    try{
+        const transaction = indiPrefDB.transaction(["preferences"], "readwrite");
+        const objStore = transaction.objectStore("preferences");
 
-    objStore.put(storeData, preferencesDefault.id);
+        objStore.put(storeData, preferencesDefault.id);
+
+        transaction.oncomplete = function(){
+            let service = (preference.service.length > 12)? preference.service.substr(0, 12) + '&hellip;' : preference.service;
+            let domain = (preference.domain.length > 12)? preference.domain.substr(0, 12) + '&hellip;' : preference.domain;
+            displayAlert(`Preference for the domain <strong>"${domain}"</strong> under the service <strong>"${service}"</strong> was saved.`, "success", 3);
+        }
+    }
+    catch (e) {
+        console.log(e);
+    }
 }
 
 /**
@@ -361,13 +345,20 @@ function get_main_domain_or_ip(domain_or_ip){
     //check if it is an ip address - return it including the port
     const ip_array = domain_or_ip_without_port.split(".");
     if (ip_array.length == 4) {
-        for (let i = 0; i &lt; 4; i++) {
-            if ( 0 &lt;= ip_array[i] &amp;&amp; ip_array[i] &lt;= 255 &amp;&amp; !isNaN(ip_array[i]) ) {
+        for (let i = 0; i < 4; i++) {
+            if ( 0 <= ip_array[i] && ip_array[i] <= 255 && !isNaN(ip_array[i]) ) {
                 return domain_or_ip; //or return domain_or_ip_without_port to get rid of the port
             }
         }
     }
     const hostName = domain_or_ip_without_port;
+
+    //if the string contains an IP address, return the IP address
+    let matchIPv4 = domain_or_ip_without_port.match(/(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(:\d{1,5})?/g);
+    if(matchIPv4 != null){
+        return matchIPv4[0];
+    }
+
     let result = domain_or_ip_without_port;
 
     try {
@@ -442,7 +433,7 @@ function generatePassword(){
 
         // hash the message N times
         let hashBuffer = await crypto.subtle.digest('SHA-512', msgBuffer);
-        for (let i = 1; i &lt; N; i++) {
+        for (let i = 1; i < N; i++) {
             hashBuffer = await crypto.subtle.digest('SHA-512', hashBuffer);
         }
 
@@ -470,13 +461,13 @@ function generatePassword(){
         * as a result, if we choose all four sets and the pwd len is 4, all four characters will each from from a selected subset
         * */
         let i = 0;
-        for (let k = 0; k &lt; character_set_selection.subsets.length; k++) {
+        for (let k = 0; k < character_set_selection.subsets.length; k++) {
             const charSubsetMap = character_set_selection.subsets[k].split(''); //an array
             encoded_result += charSubsetMap[ hashArray[k] % charSubsetMap.length ];
             i++;
         }
         const charSetMap = character_set_selection.complete_set.split('');
-        for (let k = i; k &lt; hashArray.length; k++) {
+        for (let k = i; k < hashArray.length; k++) {
             encoded_result += charSetMap[hashArray[k] % charSetMap.length];
         }
 
@@ -496,10 +487,24 @@ function generatePassword(){
         });
 }
 
-/***/
-function getSubdomainsOptions(domain, service_name){
-    var splittedDomain = domain.split(".");
-    var subdomains = splittedDomain.slice(0, splittedDomain.indexOf(service_name)); // array of subdomains without public suffix
+/** Returns an array of possible service name options derived from the subdomains. For example:
+ * developer.mozilla.org -> ["mozilla", "developer.mozilla"]
+ * a.b.c.d.[publicsuffix] -> ["d", "c.d", "b.c.d", "a.b.c.d"]
+ *
+ * @param {string} domain - the domain that was already extracted beforehand during initialization
+ * @returns {Array} - an array of possible service name options derived from the subdomains*/
+function getSubdomainsOptions(domain){
+    //if there is an ip address in there, just return the IP address
+    let matchIpv4Address = domain.match(/(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(:\d{1,5})?/g);
+    if(matchIpv4Address != null){
+        return matchIpv4Address;
+    }
+
+    publicSuffixList.parse(suffListData, punycode.toASCII);
+    var publicSuffix = publicSuffixList.getPublicSuffix(domain);
+
+    var splittedDomain = domain.split("."); console.log(splittedDomain);
+    var subdomains = splittedDomain.slice(0, splittedDomain.indexOf(publicSuffix)); // array of subdomains without public suffix
 
     var optionstring = new String();
     let result = [];
@@ -508,6 +513,8 @@ function getSubdomainsOptions(domain, service_name){
         result.push(optionstring);
         optionstring = "." + optionstring;
     }
+    // console.log(`The possible subdomains are: `);
+    // console.log(result);
     return result;
 }
 
@@ -517,9 +524,15 @@ function getSubdomainsOptions(domain, service_name){
  * @param {Array} allServicesArray - an array of all the service names for the active profile
  * @returns {void}*/
 function displayUIDetails(allServicesArray){
+    //disable saving in incognito mode
+    if(browser.extension.inIncognitoContext){
+        DOM_store_preference.checked = false;
+        DOM_store_preference.disabled = true;
+    }
+
     //"generate and save" button
     if(DOM_store_preference.checked){
-        document.getElementById("home-generate_password-btn").innerText = "Generate &amp; Save";
+        document.getElementById("home-generate_password-btn").innerText = "Generate & Save";
         document.getElementById("toggle-save-preference-btn").innerText = "bookmark_add";
     }
     else{
@@ -557,7 +570,7 @@ function displayUIDetails(allServicesArray){
         datalist.append(option);
     });
 
-    DOM_generated_password.value = "";
+
     document.getElementById("home-update_warning-container").hidden = true;
 
 }
@@ -567,6 +580,9 @@ function displayUIDetails(allServicesArray){
  * @returns {void}*/
 async function initialize(){
     console.log(`Initializing!`);
+
+    DOM_user_password.value = "";
+    DOM_generated_password.value = "";
 
     //catch the errors here too!
     suffListData = await browser.storage.local.get("publicsuffix").then(result => result.publicsuffix.data);
@@ -593,7 +609,7 @@ async function initialize(){
     DOM_domain_name.innerText = domain;
     DOM_domain_main_part.value = service_name;
 
-    if(preferencesDefault.encrypt == true &amp;&amp; encryptionPassword.getPasswordForID(preferencesDefault.id) === undefined){
+    if(preferencesDefault.encrypt == true && encryptionPassword.getPasswordForID(preferencesDefault.id) === undefined){
         //display the decryption password segment, hide the others
         document.getElementById("popup-home").hidden = true;
         document.getElementById("popup-encryption_pwd").hidden = false;
@@ -604,7 +620,7 @@ async function initialize(){
     else {
         document.getElementById("popup-encryption_pwd").hidden = true;
 
-        try {
+        try {//in case indiPrefDB is undefined
             //nacitaj vsetky indiPref aktualneho profilu
             indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, encryptionPassword.getPasswordForID(preferencesDefault.id));
         }catch (error){
@@ -624,8 +640,10 @@ async function encryptionPasswordInputHandler(){
     console.log(`This is the password we got: ${password}`);
 
     try {
-        console.log(`Getting the preferences for ${preferencesDefault.profile} with id ${preferencesDefault.profile}`);
-        indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, password);
+        if(indiPrefDB !== undefined){ //only proceed if database is not undefined, otherwise it'd throw an error
+            console.log(`Getting the preferences for ${preferencesDefault.profile} with id ${preferencesDefault.profile}`);
+            indiPrefs = await getAllIndiPrefsForActiveProfile(indiPrefDB, preferencesDefault, password); //this will throw an error if decryption fails
+        }
 
         encryptionPassword.passwords.push({profile_id: preferencesDefault.id, password: password});
 
@@ -640,7 +658,7 @@ async function encryptionPasswordInputHandler(){
         fillUIWithPreferences();
     } catch(error){
         console.log(error);
-        displayError("Decryption error");
+        displayAlert("Decryption error", "danger", 3);
     }
 }
 
@@ -688,14 +706,16 @@ async function fillUIWithPreferences() {
     DOM_store_preference.checked = prefDefault.save_preferences;
 
     //ADDING THE AUTOFILL
-    // const subdomainslist = getSubdomainsOptions(domain);
-    // console.log(`Subdomains options: `);
-    // console.log(subdomainslist, service_name);
+    const subdomainslist = getSubdomainsOptions(domain);
+    const allServices = getAllServices();
 
-    const allServicesArray = getAllServices();
-    // allServicesArray.unshift.apply(this, subdomainslist);
+    let serviceNameOptionsArray = subdomainslist.concat(allServices);
+    //filter out duplicates
+    serviceNameOptionsArray = serviceNameOptionsArray.filter((el, index, thisArray) => {
+       return thisArray.indexOf(el) === index;
+    });
 
-    displayUIDetails(allServicesArray);
+    displayUIDetails(serviceNameOptionsArray);
 }
 
 /**Sets the inputs in the UI - password encoding and password length
@@ -731,23 +751,39 @@ function fillProfileSelect(preferences, activeProfileId){
 
 //take the error place and append some error elements with children
 /** Takes an error message and displaus the error in the UI
- * @param {string} error_text - error message*/
-function displayError(error_text){
-    const errors_container = document.getElementById("errors-container");
+ * @param {string} alert_text - alert message
+ * @param {string} alert_type - type of alert - danger, success, warning, etc.
+ * @param {number} display_time - the length of time to keep the alert displayed for
+ * @returns {void}*/
+function displayAlert(alert_text, alert_type, display_time){
+    const alerts_container = document.getElementById("alerts-container");
 
-    const myError = document.createElement("div");
+    switch(alert_type){
+        case "danger": css_type = "alert-danger"; break;
+        case "success": css_type = "alert-success"; break;
+        case "info": css_type = "alert-info"; break;
+        case "warning": css_type = "alert-warning"; break;
+    }
+
+    const newAlert = document.createElement("div");
     const span = document.createElement("span");
     span.classList.add("close_alert-btn");
-    span.innerHTML = "&amp;times;";
+    span.innerHTML = "&times;";
     span.addEventListener("click", function(){this.parentElement.style.display='none'});
 
-    myError.classList.add("alert", "alert-danger");
-    myError.appendChild(span);
-    myError.appendChild(document.createTextNode(error_text));
+    newAlert.classList.add("alert", css_type);
+    newAlert.innerHTML = alert_text;
+    newAlert.appendChild(span);
 
-    errors_container.appendChild(myError);
-    setTimeout(function(){myError.style.opacity = 0;}, 3000);
-    setTimeout(function(){errors_container.removeChild(myError)}, 4000);
+    alerts_container.appendChild(newAlert);
+    if(display_time !== undefined) {
+        setTimeout(function () {
+            newAlert.style.opacity = 0;
+        }, display_time * 1000);
+        setTimeout(function () {
+            alerts_container.removeChild(newAlert)
+        }, display_time * 1000 + 500);
+    }
 }
 
 /** displays the warning container warning the user about a potential change in the saved preferences
@@ -783,19 +819,19 @@ function generatePasswordHandler(event){
     let invalidInput = false;
     if(DOM_user_password.value == ""){
         //notify about the error
-        displayError("Pasword field is empty."); invalidInput = true;
+        displayAlert("Pasword field is empty.", "danger", 3); invalidInput = true;
     }
     //validate password length - redundant because we're using the slider anyway
-    if(isNaN(DOM_password_length.value)  || DOM_password_length.value &lt; 4 || DOM_password_length.value > 64){
-        displayError("Invalid password length. Password length must be a number in the range of 4 and 64."); invalidInput = true;
+    if(isNaN(DOM_password_length.value)  || DOM_password_length.value < 4 || DOM_password_length.value > 64){
+        displayAlert("Invalid password length. Password length must be a number in the range of 4 and 64.", "danger", 3); invalidInput = true;
     }
     //validate that at least one character set was chosen
-    if(!DOM_checkbox_lower_case.checked &amp;&amp; !DOM_checkbox_upper_case.checked
-        &amp;&amp; !DOM_checkbox_numbers.checked &amp;&amp; !DOM_checkbox_special_chars.checked){
-        displayError("No character set chosen."); invalidInput = true;
+    if(!DOM_checkbox_lower_case.checked && !DOM_checkbox_upper_case.checked
+        && !DOM_checkbox_numbers.checked && !DOM_checkbox_special_chars.checked){
+        displayAlert("No character set chosen.", "danger", 3); invalidInput = true;
     }
     if(DOM_domain_main_part.value == ""){
-        displayError("Service field is empty."); invalidInput = true;
+        displayError("Service field is empty.", "danger", 3); invalidInput = true;
     }
 
     if(invalidInput){
@@ -811,6 +847,7 @@ function generatePasswordHandler(event){
             console.log(`Inserting generated password into content page...`);
             browser.tabs.query({active: true, currentWindow: true})
                 .then(tabs => {
+                    browser.tabs.executeScript(tabs[0].id, {file: "/browser-polyfill.js"});
                     browser.tabs.executeScript(tabs[0].id, {file: "/content_scripts/content_script.js"}).then(array => {
                         browser.tabs.sendMessage(tabs[0].id, {
                             message: "inject",
@@ -826,7 +863,7 @@ function generatePasswordHandler(event){
     });
 
     //store if desired
-    if(DOM_store_preference.checked){
+    if(DOM_store_preference.checked && event.key !== 'Enter'){
         //store rule in database
         storePrefInDB();
     }
@@ -876,7 +913,7 @@ async function changeInServiceNameHandler(event){
  * @returns {void}*/
 function potentialUpdateOfPreferencesHandler(){
     if(DOM_store_preference.checked){
-        document.getElementById("home-generate_password-btn").innerText = "Generate &amp; Save";
+        document.getElementById("home-generate_password-btn").innerText = "Generate & Save";
         document.getElementById("toggle-save-preference-btn").innerText = "bookmark_add";
     }
     else {
@@ -889,7 +926,7 @@ function potentialUpdateOfPreferencesHandler(){
         return;
     }
 
-    if(DOM_store_preference.checked &amp;&amp; (
+    if(DOM_store_preference.checked && (
         DOM_checkbox_lower_case.checked != preferenceForService.encoding.lower ||
         DOM_checkbox_upper_case.checked != preferenceForService.encoding.upper ||
         DOM_checkbox_numbers.checked != preferenceForService.encoding.num ||
@@ -980,7 +1017,7 @@ DOM_user_password.addEventListener("keypress", function(e){
 document.getElementById("home-generate_password-btn").addEventListener("click", generatePasswordHandler);
 document.getElementById("toggle-show-pwd-btn").addEventListener("click", function(event){
     const span = event.target;
-    if(DOM_generated_password.type == "password" &amp;&amp; DOM_generated_password.value != "") {
+    if(DOM_generated_password.type == "password" && DOM_generated_password.value != "") {
         DOM_generated_password.type = "text";
         span.innerText = "visibility";
     }
@@ -1003,7 +1040,7 @@ DOM_domain_main_part.addEventListener("keypress", function(event){
 document.querySelectorAll('#home-pwd_options input').forEach(e => {
   e.addEventListener("change", potentialUpdateOfPreferencesHandler);
 });
-DOM_store_preference.addEventListener("click", potentialUpdateOfPreferencesHandler);
+DOM_store_preference.addEventListener("change", potentialUpdateOfPreferencesHandler);
 
 document.getElementById("heading-profile_select").addEventListener("change", profileChangeHandler);
 
@@ -1031,26 +1068,3 @@ document.getElementById("copy-generated-pwd-btn").addEventListener("click", copy
 * it's going to load the same preferences for abc.com and abc.eu despite the fact that they have different domains. - ofc this might be better in the sense that it will
 * alert the user to the fact that these domains are different and that he will need to save on of them under a separate service name.
 * */
-</code></pre>
-        </article>
-    </section>
-
-
-
-
-</div>
-
-<nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#addProfile">addProfile</a></li><li><a href="global.html#allPreferencesArray">allPreferencesArray</a></li><li><a href="global.html#allProfilesDefaults">allProfilesDefaults</a></li><li><a href="global.html#changeActiveProfileHandler">changeActiveProfileHandler</a></li><li><a href="global.html#changeInServiceNameHandler">changeInServiceNameHandler</a></li><li><a href="global.html#changePasswordSettings">changePasswordSettings</a></li><li><a href="global.html#changeProfileName">changeProfileName</a></li><li><a href="global.html#changeServiceName">changeServiceName</a></li><li><a href="global.html#CHARACTER_SETS">CHARACTER_SETS</a></li><li><a href="global.html#copyGeneratePwdToClipboard">copyGeneratePwdToClipboard</a></li><li><a href="global.html#decode">decode</a></li><li><a href="global.html#decrypt">decrypt</a></li><li><a href="global.html#deleteAllStoredPreferences">deleteAllStoredPreferences</a></li><li><a href="global.html#deleteDomain">deleteDomain</a></li><li><a href="global.html#deleteEntryForProfileFromDB">deleteEntryForProfileFromDB</a></li><li><a href="global.html#deleteProfile">deleteProfile</a></li><li><a href="global.html#deleteService">deleteService</a></li><li><a href="global.html#displayCurrentDefaultPreferences">displayCurrentDefaultPreferences</a></li><li><a href="global.html#displayError">displayError</a></li><li><a href="global.html#displayPotentialChangeInStorageWarning">displayPotentialChangeInStorageWarning</a></li><li><a href="global.html#displayPreferences">displayPreferences</a></li><li><a href="global.html#displayProfiles">displayProfiles</a></li><li><a href="global.html#displayProfileSelect">displayProfileSelect</a></li><li><a href="global.html#displayUIDetails">displayUIDetails</a></li><li><a href="global.html#downloadFromGDrive">downloadFromGDrive</a></li><li><a href="global.html#ejectDomain">ejectDomain</a></li><li><a href="global.html#encode">encode</a></li><li><a href="global.html#encrypt">encrypt</a></li><li><a href="global.html#encryptionPassword">encryptionPassword</a></li><li><a href="global.html#encryptionPasswordInputHandler">encryptionPasswordInputHandler</a></li><li><a href="global.html#exportPreferences">exportPreferences</a></li><li><a href="global.html#extractAccessToken">extractAccessToken</a></li><li><a href="global.html#FILE_NAME">FILE_NAME</a></li><li><a href="global.html#fillProfileSelect">fillProfileSelect</a></li><li><a href="global.html#fillUIWithPreferences">fillUIWithPreferences</a></li><li><a href="global.html#generatePassword">generatePassword</a></li><li><a href="global.html#generatePasswordHandler">generatePasswordHandler</a></li><li><a href="global.html#get_main_domain_or_ip">get_main_domain_or_ip</a></li><li><a href="global.html#get_url_without_protocol_or_path">get_url_without_protocol_or_path</a></li><li><a href="global.html#getAccessToken">getAccessToken</a></li><li><a href="global.html#getAllIndiPrefsForActiveProfile">getAllIndiPrefsForActiveProfile</a></li><li><a href="global.html#getAllPrefsForProfileFromDB">getAllPrefsForProfileFromDB</a></li><li><a href="global.html#getAllServices">getAllServices</a></li><li><a href="global.html#getDefaultPreferences">getDefaultPreferences</a></li><li><a href="global.html#getExportData">getExportData</a></li><li><a href="global.html#getFileFromDrive">getFileFromDrive</a></li><li><a href="global.html#getKey">getKey</a></li><li><a href="global.html#getKeyMaterial">getKeyMaterial</a></li><li><a href="global.html#getPrefForDomain">getPrefForDomain</a></li><li><a href="global.html#getPrefForService">getPrefForService</a></li><li><a href="global.html#HASH_N_TIMES">HASH_N_TIMES</a></li><li><a href="global.html#importSettings">importSettings</a></li><li><a href="global.html#indiPrefDB">indiPrefDB</a></li><li><a href="global.html#indiPrefs">indiPrefs</a></li><li><a href="global.html#initDefaultPreferences">initDefaultPreferences</a></li><li><a href="global.html#initExtension">initExtension</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initIndiPrefDB">initIndiPrefDB</a></li><li><a href="global.html#initPublicSuffDataStorage">initPublicSuffDataStorage</a></li><li><a href="global.html#insertDefaultSettings">insertDefaultSettings</a></li><li><a href="global.html#isProfileNameValid">isProfileNameValid</a></li><li><a href="global.html#isStored">isStored</a></li><li><a href="global.html#isValidImportedJSON">isValidImportedJSON</a></li><li><a href="global.html#launchAuthFlow">launchAuthFlow</a></li><li><a href="global.html#listFiles">listFiles</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#openIndiPrefDB">openIndiPrefDB</a></li><li><a href="global.html#potentialUpdateOfPreferencesHandler">potentialUpdateOfPreferencesHandler</a></li><li><a href="global.html#preferenceForService">preferenceForService</a></li><li><a href="global.html#preferencesDefault">preferencesDefault</a></li><li><a href="global.html#profileChangeHandler">profileChangeHandler</a></li><li><a href="global.html#putFileToDrive">putFileToDrive</a></li><li><a href="global.html#putIndiPrefsForProfileInDB">putIndiPrefsForProfileInDB</a></li><li><a href="global.html#refillIndiPrefsOfProfileInDB">refillIndiPrefsOfProfileInDB</a></li><li><a href="global.html#saveModifiedTable">saveModifiedTable</a></li><li><a href="global.html#setPasswordPreferencesInHomepageUI">setPasswordPreferencesInHomepageUI</a></li><li><a href="global.html#showPopupAbout">showPopupAbout</a></li><li><a href="global.html#showPopupDefaults">showPopupDefaults</a></li><li><a href="global.html#showPopupHome">showPopupHome</a></li><li><a href="global.html#showQRCode">showQRCode</a></li><li><a href="global.html#sortAllPreferencesArray">sortAllPreferencesArray</a></li><li><a href="global.html#storePrefInDB">storePrefInDB</a></li><li><a href="global.html#toggleAllDomainsRows">toggleAllDomainsRows</a></li><li><a href="global.html#toggleDomainsRow">toggleDomainsRow</a></li><li><a href="global.html#toggleEncryptProfile">toggleEncryptProfile</a></li><li><a href="global.html#updatePreferencesHandler">updatePreferencesHandler</a></li><li><a href="global.html#uploadToGDrive">uploadToGDrive</a></li><li><a href="global.html#validate">validate</a></li></ul>
-</nav>
-
-<br class="clear">
-
-<footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Jun 15 2021 04:39:48 GMT+0200 (Central European Summer Time)
-</footer>
-
-<script> prettyPrint(); </script>
-<script src="scripts/linenumber.js"> </script>
-</body>
-</html>

@@ -11,17 +11,16 @@ const AUTH_URL =
 const VALIDATION_BASE_URL="https://www.googleapis.com/oauth2/v3/tokeninfo";
 
 
-/*
-+ Takes the redirect URI and extracts the token.
-+ Stores (caches) the token in window.localStorage\
-+ returns: extracted token
+/**
+* Takes the redirect URI and extracts the token. Stores (caches) the token in window.localStorage.
+ * @param {string} redirectUri - the redirect URI containing the access token after the user has authorised our app
+* @returns {string} the extracted token
 */
 function extractAccessToken(redirectUri) {
     let m = redirectUri.match(/[#?](.*)/);
-    //d
-    console.log("This is the regex match result for the redirectURI:");
-    console.log(m);
-    //ed
+
+    console.log(redirectUri);
+
     if (!m || m.length < 1)
         return null;
     let params = new URLSearchParams(m[1].split("#")[0]);
@@ -44,6 +43,9 @@ function extractAccessToken(redirectUri) {
  - otherwise it is not valid
  Note that the Google page talks about an "audience" property, but in fact
  it seems to be "aud".
+
+ @param {string} accessToken - the access token
+ @returns {Promise} a Promise which resolves with the valid access token, or rejects if the the token is invalid
  */
 function validate(accessToken) {
 
@@ -78,6 +80,8 @@ function validate(accessToken) {
     return fetch(validationRequest).then(checkResponse);
 }
 
+/** use browser.identity.launchWebAuthFlow to launch the authentication flow at the specified authorization url
+ * @returns {Promise} - If the extension is authorized successfully, this will be fulfilled with a string containing the redirect URL. The URL will include a parameter that either is an access token or can be exchanged for an access token, using the documented flow for the particular service provider. */
 function launchAuthFlow(){
     return browser.identity.launchWebAuthFlow({
         interactive: true,
@@ -85,17 +89,11 @@ function launchAuthFlow(){
     });
 }
 
-/*
-  Returns an access token
-  1. check if there is a token in the browser memory
-  + there is a token
-     1.A validate the token
-       + the token is valid - return the token
-       + the token is invalid - jump to 1.B.1
-  + there is no token cached
-     1.B.1 launch the authentication flow to get a token
-     1.B.2 get a token from the redirect URI
-     1.B.3 validate the token and then return it
+/**
+  checks if there is a token in window.localStorage. If there is, validate the token, if the token is invalid, launch web auth flow again to get a new token
+ If there is no toekn in window.localStorage. launch web auth flow to get a token then validate it.
+
+ @returns {Promise} a promise which fulfills with the valid token
 */
 function getAccessToken(){
     //d
@@ -116,11 +114,13 @@ function getAccessToken(){
     }
 }
 
+/** Gets access token and uses it to list all of the files that this app has access to and sorts them by modified time
+ * @returns {Array} an array of all the files*/
 function listFiles(){
     function sendRequestToAPI(accessToken){
 
         const queryString = "name = 'passwordgen.txt'";
-        const requestURL = `https://www.googleapis.com/drive/v3/files?orderBy=modifiedByMeTime&q=${encodeURIComponent(queryString)}`;
+        const requestURL = `https://www.googleapis.com/drive/v3/files?orderBy=modifiedByMeTime&q=${encodeURIComponent(queryString)}`; //https://developers.google.com/drive/api/v3/reference/files/list
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
         //requestHeaders.append('Accept', 'application/json');
@@ -147,12 +147,27 @@ function listFiles(){
         .catch(error => console.log(error));
 }
 
+/**File name to put to drive
+ * @const {string}*/
 const FILE_NAME = "passwordgen.txt";
 
+/**
+ * Takes the content and sends it to google drive. If there are no files in the drive which belong to this app, it will create a new one. If there already is a file,
+ * it will update that file. See more at: https://developers.google.com/drive/api/v3/reference/files/create
+ * Will throw an error if the authorization process fails.
+ * @param {object} content - json object, which is then stringified and put to drive
+ * @returns {Promise} A promise as a result of using fetch which should resolve with the file id in the drive.
+ * */
 async function putFileToDrive(content){
 
+    //if getting the access token fails (for example user aborts authorization), it'll throw an error "Error: User cancelled or denied access."
+    //i.e., this async function puFileToDrive will also abort and throw that error
     const accessToken = await getAccessToken();
     const files_in_drive = await listFiles();
+
+    //this random hex string is used as a boundary in the multipart request body - just so we decrease the chance of the content containing "--boundary" and messing up the request
+    const randomString = Math.random().toString(16).substr(2, 8);
+    const boundary = `boundary${randomString}`;
 
     console.log(`PasswordGen's files in drive are: `);
     console.log(files_in_drive);
@@ -162,16 +177,16 @@ async function putFileToDrive(content){
         const requestURL = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
-        requestHeaders.append('Content-Type', 'multipart/related;boundary=boundary');
+        requestHeaders.append('Content-Type', `multipart/related;boundary=${boundary}`);
 
         const requestBody =
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: application/json;charset=UTF-8\n\n' +
             `{"name": "${FILE_NAME}"}\n` +
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: text/plain\n\n' +
             JSON.stringify(content, null, 4) + '\n' +
-            '--boundary--';
+            `--${boundary}--`;
 
         const driveRequest = new Request(requestURL, {
             method: "POST",
@@ -182,7 +197,9 @@ async function putFileToDrive(content){
         console.log("Creating a new file in Google Drive");
         return fetch(driveRequest).then((response) => {
             if (response.status === 200) {
-                return response.json();
+                let resp = response.json();
+                console.log(resp);
+                return resp;
             } else {
                 throw response.status;
             }
@@ -197,16 +214,16 @@ async function putFileToDrive(content){
         const requestURL = `https://www.googleapis.com/upload/drive/v3/files/${fileToUpdateID}?uploadType=multipart`;
         const requestHeaders = new Headers();
         requestHeaders.append('Authorization', 'Bearer ' + accessToken);
-        requestHeaders.append('Content-Type', 'multipart/related;boundary=boundary');
+        requestHeaders.append('Content-Type', `multipart/related;boundary=${boundary}`);
 
         const requestBody =
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: application/json;charset=UTF-8\n\n' +
             `{"name": "${FILE_NAME}"}\n` +
-            '--boundary\n' +
+            `--${boundary}\n` +
             'Content-Type: text/plain\n\n' +
             JSON.stringify(content, null, 4) + '\n' +
-            '--boundary--';
+            `--${boundary}--`;
 
         const driveRequest = new Request(requestURL, {
             method: "PATCH",
@@ -216,7 +233,9 @@ async function putFileToDrive(content){
 
         return fetch(driveRequest).then((response) => {
             if (response.status === 200) {
-                return response.json();
+                let resp = response.json();
+                console.log(resp);
+                return resp;
             } else {
                 throw response.status;
             }
@@ -224,6 +243,9 @@ async function putFileToDrive(content){
     }
 }
 
+/** Gets the contents of the newest file from drive.
+ * Will throw an error if authorization fails.
+ * @returns {Promise} promise which resolves with the text content of the file or an empty object*/
 async function getFileFromDrive(){
     const accessToken = await getAccessToken();
     const files_in_drive = await listFiles();
@@ -251,6 +273,6 @@ async function getFileFromDrive(){
     }
     else {
         console.log("No file found in Drive, returning empty object...");
-        return {};
+        throw "No back-up file found";
     }
 }
